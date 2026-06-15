@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Routing motif matching scripts/gen-icon.mjs: two jack ports joined by a glowing amber wire. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241c11" />
+      <stop offset="1" stop-color="#120f0a" />
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="22" />
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)" />
+  <path d="M300 600 C512 600 512 424 724 424" fill="none" stroke="#ffb84d"
+    stroke-width="46" stroke-linecap="round" filter="url(#glow)" opacity="0.5" />
+  <path d="M300 600 C512 600 512 424 724 424" fill="none" stroke="#ffb84d"
+    stroke-width="46" stroke-linecap="round" />
+  <g>
+    <circle cx="300" cy="600" r="70" fill="#0c0a07" />
+    <circle cx="300" cy="600" r="63" fill="none" stroke="#ffb84d" stroke-width="14" />
+    <circle cx="300" cy="600" r="26" fill="#ffd27a" />
+    <circle cx="724" cy="424" r="70" fill="#0c0a07" />
+    <circle cx="724" cy="424" r="63" fill="none" stroke="#ffb84d" stroke-width="14" />
+    <circle cx="724" cy="424" r="26" fill="#ffd27a" />
+  </g>
+</svg>
