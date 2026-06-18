@@ -50,6 +50,18 @@ export interface FileFilter {
   label: string;
 }
 
+/**
+ * Confirm dialog that works in both environments. A Tauri webview blocks the
+ * native window.confirm (and makes it async), so there we drive the dialog
+ * plugin's message command (OK / Cancel, permitted by dialog:default); a plain
+ * browser keeps the synchronous window.confirm, which the e2e suite relies on.
+ */
+export async function confirmDialog(message: string): Promise<boolean> {
+  if (!isTauri()) return window.confirm(message);
+  const result = await invoke<string>("plugin:dialog|message", { message, buttons: "OkCancel" });
+  return result === "Ok";
+}
+
 /** Native save dialog (dialog plugin) → chosen path, or null if canceled / not in Tauri. */
 export async function nativeSavePath(defaultName: string, filter: FileFilter): Promise<string | null> {
   if (!isTauri()) return null;
