@@ -19,7 +19,7 @@ import type { Selection, ThemeName } from "./ui/graph";
 import { renderInspector } from "./ui/inspector";
 import { getLang, LANG_NAMES, onLangChange, setLang, t } from "./i18n";
 import { DEMO } from "./core/env";
-import { checkUpdate, installUpdate, restartApp } from "./core/platform";
+import { checkUpdate, confirmDialog, installUpdate, restartApp } from "./core/platform";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -176,7 +176,7 @@ function loadFromText(text: string, path?: string): boolean {
 }
 
 async function openRecent(path: string): Promise<void> {
-  if (!confirmDiscard()) return;
+  if (!(await confirmDiscard())) return;
   try {
     const text = await readTextByPath(path);
     loadFromText(text, path);
@@ -185,15 +185,15 @@ async function openRecent(path: string): Promise<void> {
   }
 }
 
-function confirmDiscard(): boolean {
+async function confirmDiscard(): Promise<boolean> {
   if (!dirty) return true;
-  return window.confirm(t().confirm.discard);
+  return confirmDialog(t().confirm.discard);
 }
 
-picker.addEventListener("change", () => {
+picker.addEventListener("change", async () => {
   const next = picker.value as ModelId;
   if (next === modelId) return;
-  if (!confirmDiscard()) {
+  if (!(await confirmDiscard())) {
     picker.value = modelId;
     return;
   }
@@ -208,14 +208,14 @@ ratePicker.addEventListener("change", () => {
   setStatus(t().status.sampleRate(formatRate(plan.sampleRate)));
 });
 
-$("btn-new").addEventListener("click", () => {
-  if (!confirmDiscard()) return;
+$("btn-new").addEventListener("click", async () => {
+  if (!(await confirmDiscard())) return;
   loadPlan(emptyPlan(modelId));
   setStatus(t().status.newPlan);
 });
 
 $("btn-open").addEventListener("click", async () => {
-  if (!confirmDiscard()) return;
+  if (!(await confirmDiscard())) return;
   try {
     const doc = await openTextDocument({ ext: "json", label: t().filter.plan });
     if (!doc) return;
@@ -304,7 +304,7 @@ async function checkForUpdates(): Promise<void> {
   try {
     const update = await checkUpdate();
     if (!update) return;
-    if (!window.confirm(t().confirm.update(update.version))) return;
+    if (!(await confirmDialog(t().confirm.update(update.version)))) return;
     setStatus(t().status.updateDownloading);
     await installUpdate(update.rid);
     // The new bundle is installed; relaunch into it. Nothing runs past here.
