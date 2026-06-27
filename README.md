@@ -60,8 +60,8 @@ self-test diagnostic on top.
 URX Router talks to the hardware using a control protocol determined by independent
 analysis, not from official documentation. Every parameter the tool writes has been checked
 against a connected device, but sending data to hardware always carries some risk. **Writing
-a plan to the device overwrites its current mixer settings** — back up anything you want to
-keep (using the manufacturer's own software) first.
+a plan to the device overwrites its current mixer settings** — save anything you want to
+keep to a scene on the device first.
 
 By using URX Router you accept this risk. The software is provided "as is", without warranty
 of any kind, and the authors are not liable for any damage to hardware, loss of settings, or
