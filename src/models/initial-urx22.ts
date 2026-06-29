@@ -66,15 +66,16 @@ const ducker = (): NodeParams => ({
 });
 
 export const URX22_NODE_PARAMS: Record<string, NodeParams> = {
-  ch1: monoChannel(),
+  // Signal Type (stereoLink) / PAN-BAL live on the mono pair's primary (CH1) only.
+  ch1: { ...monoChannel(), stereoLink: false, panBal: 0 },
   ch2: monoChannel(false),
   ch_3_4: stereoChannel(0),
   ch_5_6: stereoChannel(-14),
   ch_7_8: stereoChannel(0),
   ch_9_10: stereoChannel(-14),
   "bus.stereo": { ...outputBus(), on: true },
-  "bus.mix1": { ...outputBus(), busType: 0 },
-  "bus.mix2": { ...outputBus(), busType: 0 },
+  "bus.mix1": { ...outputBus(), busType: 0, on: true, panLink: false },
+  "bus.mix2": { ...outputBus(), busType: 0, on: true, panLink: false },
   // FX channels ship ON at the factory (param 338, def 1) with their factory
   // effect program (FX1 = Rev-X Hall, FX2 = Mono Delay), inferred from the URX44V
   // capture — the FX channels are identical across models.
@@ -100,8 +101,8 @@ export const URX22_NODE_PARAMS: Record<string, NodeParams> = {
   "out.ducker2": ducker(),
   "out.ducker3": ducker(),
   "out.ducker4": ducker(),
-  "bus.mon1": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2 },
-  "bus.mon2": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2 },
+  "bus.mon1": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2, on: true },
+  "bus.mon2": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2, on: true },
   "bus.osc": { osc: { on: false, level: -14, mode: 0, freq: 1000, width: 0.1, interval: 1 } },
   // STREAMING DELAY factory state (off, 1.00 ms, 30 fps), inferred from URX44V.
   "bus.stream": { delay: { on: false, time: 1, frameRate: 5 } },
