@@ -196,8 +196,8 @@ dotted line** so the live routing stands out, and a toolbar **"Hide off sends"**
   independent L/R in the wire (`oscL` / `oscR`); FX buses are mono)
 - MIX 1 / MIX 2 → STEREO (`sendSwitch`; the "TO ST" send inside the MIX 1–2 OUT block — **fixed**, always
   wired and non-removable. ON/OFF only, no independent LEVEL/PAN; the on/off is the TO ST switch held in
-  `params.on` (**off at the factory**), and off is dimmed on the canvas. The device's TO ST has no confirmed
-  param, so it is not written to the device)
+  `params.on` (**off at the factory**), and off is dimmed on the canvas. Pushed to the device as param `677`
+  at the stereo MIX's L instance (MIX1 = 0 / MIX2 = 2); confirmed by live param-notify)
 
 > **Post Fader Send for FX (DAW Integration menu, V1.2+).** Each FX bus can additionally be fed by a
 > MIX bus **post-fader** (FX 1 ← MIX n, FX 2 ← MIX n). This appears only when compatible DAW software

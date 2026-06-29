@@ -218,6 +218,31 @@ export const PARAMS = {
    *  per stereo MIX (MIX1 [0,1] / MIX2 [2,3]); default 1. Independent of the MIX →
    *  STEREO "TO ST" send. Confirmed by live readback (device-side MIX2 OFF → 675). */
   OUT_MASTER_ON: { id: 675, axis: "output", encoding: "bool", follow: "direct" },
+  /** MIX 1/2 → STEREO "TO ST" send ON/OFF. Per stereo MIX, addressed at the bus's
+   *  L instance (MIX1 = 0, MIX2 = 2); not L/R-linked. Default 0 (off). Confirmed by
+   *  live param-notify (device-side MIX1 OFF → ON fired 677:0:0 = 1, MIX2 → 677:0:2).
+   *  Held in the MIX → STEREO connection's params.on, not a node param. */
+  TO_ST: { id: 677, axis: "output", encoding: "bool", follow: "direct" },
+  /** MIX bus Pan Link (VARI only): each send's pan follows the source channel PAN.
+   *  Per stereo MIX, at the bus's L instance (MIX1 = 0, MIX2 = 2). Default 0 (off).
+   *  Confirmed by live param-notify (MIX1 OFF → ON fired 589:0:0 = 1, MIX2 → 589:0:2). */
+  PAN_LINK: { id: 589, axis: "output", encoding: "bool", follow: "direct" },
+  /** Signal Type stereo link for a MONO IN pair (1 = STEREO, 0 = MONO x2). Written
+   *  to BOTH channels of the pair at their input indices. Enabling it resets the
+   *  secondary channel's whole state on the device (it is copied from the primary),
+   *  so live must converge. Confirmed by live param-notify (CH1 MONO x2 ↔ STEREO
+   *  fired 23:0:0 and 23:0:1 together). */
+  SIGNAL_TYPE: { id: 23, axis: "input", encoding: "bool", sideEffect: true },
+  /** PAN / BAL mode for a STEREO-linked MONO IN pair (0 = PAN, 1 = BAL), at the
+   *  pair's primary channel input index. Switching mode rewrites the pair's pan
+   *  values on the device, so live must converge. Confirmed by live param-notify
+   *  (CH1/CH2 pair BAL → PAN fired 891:0:0 = 0). */
+  PAN_BAL: { id: 891, axis: "global", encoding: "enum", sideEffect: true },
+  /** SSMCS Sweet Spot Data preset index (MONO IN, SSMCS mode), at the channel input
+   *  index. A 4-digit zero-padded STRING ("0001".."0034"; "0035"+ clamps to "0001"),
+   *  so it rides the string-write path (vd_set_str / vd_get_str), not the numeric
+   *  catalog. Confirmed by live read (91:0:0 = "0001"). */
+  SWEET_SPOT_DATA: { id: 91, axis: "input", encoding: "raw" },
   // CH → MIX/FX bus send. The actual ids are computed per channel/bus in
   // translate.ts; these anchors are the MIX1 mono slot and only name the command
   // + encoding.

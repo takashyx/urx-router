@@ -262,6 +262,7 @@ describe("applyDeviceState round-trip", () => {
     const sends = 8 * 4 + 2 * 2; // 8 channels × (MIX1/2 + FX1/2) + 2 FX channels × MIX1/2
     const fxEffect = 2; // FX1 + FX2 effect type + parameter array
     const fxMainPath = 2; // FX1 + FX2 → STEREO main fader / balance
+    const toSt = 2; // MIX1 + MIX2 → STEREO "TO ST" switch onto the connection
     const busFaders = 3; // STEREO + MIX1 + MIX2
     const insertFx = 3 + 4; // STEREO + 2 MIX outputs + 4 mono channels
     const busEqOn = 3; // STEREO + MIX1 + MIX2
@@ -279,7 +280,7 @@ describe("applyDeviceState round-trip", () => {
     const names = 8 + 6; // CH SETTING name: same node set as color
     const sdRec = 8 + 1; // microSD Rec: 8 track-pair source slots + Track Count
     const expected =
-      channels + sends + fxEffect + fxMainPath + busFaders + insertFx + busEqOn + busEqBands + duckers + master + monitors + osc + delay + sampleRate + oscAssign + inputSource + selectors + colors + names + sdRec;
+      channels + sends + fxEffect + fxMainPath + toSt + busFaders + insertFx + busEqOn + busEqBands + duckers + master + monitors + osc + delay + sampleRate + oscAssign + inputSource + selectors + colors + names + sdRec;
     expect(result.applied).toBe(expected);
     // Sanity: far more than the channel-only count, proving every group counts.
     expect(result.applied).toBeGreaterThan(channels);

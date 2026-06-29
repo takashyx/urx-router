@@ -51,6 +51,7 @@ import {
 } from "./translate";
 import type { ParamEncoding } from "./params";
 import {
+  strToSweetSpotData,
   vdToAttack,
   vdToBool,
   vdToBurstWidth,
@@ -161,6 +162,12 @@ export async function applyDeviceState(
       if (cc.hasMicStrip) update.compEqType = await vdGet(PARAMS.COMP_EQ_TYPE.id, 0, cc.y);
       // Rec Point: per-channel record / direct-out tap (MONO IN only, param 137).
       if (cc.hasMicStrip) update.recPoint = await vdGet(PARAMS.REC_POINT.id, 0, cc.y);
+      // Signal Type (stereo link, 23) + PAN/BAL (891): pair-level CH SETTING held on
+      // the pair's primary (odd) channel. Read at the primary's input index only.
+      if (model.channelPairs.some(([a]) => a === node.id)) {
+        update.stereoLink = vdToBool(await vdGet(PARAMS.SIGNAL_TYPE.id, 0, cc.y));
+        update.panBal = await vdGet(PARAMS.PAN_BAL.id, 0, cc.y);
+      }
       // Polarity invert: one (mono) or two independent L/R (stereo).
       for (const ph of cc.phases) update[ph.key] = vdToBool(await vdGet(ph.param, 0, ph.y));
       // Channel-strip section ON (GATE/COMP/EQ). The active COMP/EQ bank follows
@@ -189,8 +196,9 @@ export async function applyDeviceState(
         } else if ((update.compEqType ?? 0) === COMP_EQ_SSMCS) {
           // SSMCS mode: read the morphing strip's raw values (mirrors emission).
           // Comp/EQ section ON were read above via channelSections (compOn/eqOn).
-          // Sweet Spot Data is plan/UI-only (string param), so not read here.
-          update.ssmcs = await readSsmcs(dyn.y);
+          // Sweet Spot Data is a string param (91), read via the string IPC.
+          const sweetSpotData = strToSweetSpotData((await vdGetStr(PARAMS.SWEET_SPOT_DATA.id, 0, dyn.y)).trim());
+          update.ssmcs = { ...(await readSsmcs(dyn.y)), sweetSpotData };
         }
       }
       conn.params = { ...conn.params, level, pan };
@@ -228,6 +236,23 @@ export async function applyDeviceState(
       } catch (e) {
         errors.push(`${node.label} → ${bus.label}: ${e instanceof Error ? e.message : String(e)}`);
       }
+    }
+  }
+
+  // MIX 1/2 → STEREO "TO ST" switch (677, MIX L instance) onto the fixed MIX →
+  // STEREO connection's params.on (mirror of the TO_ST emit in translate.ts).
+  for (const node of model.nodes) {
+    signal?.throwIfAborted();
+    const mix = MIX_FADER_INSTANCES[node.id];
+    if (!mix) continue;
+    if (!want(node.id)) continue;
+    const conn = mainSendConn(plan, node.id);
+    if (!conn) continue;
+    try {
+      conn.params = { ...conn.params, on: vdToBool(await vdGet(PARAMS.TO_ST.id, 0, mix[0])) };
+      applied++;
+    } catch (e) {
+      errors.push(`${node.label} → STEREO (TO ST): ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -429,10 +454,13 @@ export async function applyDeviceState(
       // directions cannot drift (mirror of the BUS_TYPE loop in translate.ts).
       const mix = MIX_FADER_INSTANCES[node.id];
       const busType = mix ? await vdGet(PARAMS.BUS_TYPE.id, 0, mix[0]) : undefined;
+      // Pan Link (589, MIX only, L instance) — sends' pan follows the source PAN.
+      const panLink = mix ? vdToBool(await vdGet(PARAMS.PAN_LINK.id, 0, mix[0])) : undefined;
       plan.nodeParams[node.id] = {
         ...plan.nodeParams[node.id],
         on,
         ...(busType !== undefined ? { busType } : {}),
+        ...(panLink !== undefined ? { panLink } : {}),
       };
       applied++;
     } catch (e) {
@@ -666,9 +694,9 @@ export function applyDirect(plan: Plan, node: string, name: ParamName, raw: numb
   const setNp = (patch: Partial<NodeParams>): void => {
     plan.nodeParams[node] = { ...plan.nodeParams[node], ...patch };
   };
-  // Fader / pan land on the node's fixed main path into STEREO (a send connection),
-  // mirroring how applyDeviceState reflects CH_FADER / CH_PAN.
-  const setMain = (patch: { level?: number; pan?: number }): void => {
+  // Level / pan / on land on the node's fixed main path into STEREO (a send
+  // connection): CH/FX channels carry level + pan, a MIX bus carries the TO ST on.
+  const setMain = (patch: { level?: number; pan?: number; on?: boolean }): void => {
     const conn = mainSendConn(plan, node);
     if (conn) conn.params = { ...conn.params, ...patch };
   };
@@ -695,6 +723,13 @@ export function applyDirect(plan: Plan, node: string, name: ParamName, raw: numb
     case "STEREO_MASTER_FADER":
     case "MONITOR_LEVEL":
       setNp({ level: vdToLevel(raw) });
+      return true;
+    case "PAN_LINK":
+      setNp({ panLink: vdToBool(raw) });
+      return true;
+    case "TO_ST":
+      // The MIX → STEREO "TO ST" switch lands on the MIX → STEREO connection's on.
+      setMain({ on: vdToBool(raw) });
       return true;
     case "PHONES_LEVEL":
       setNp({ phonesLevel: vdToPhonesLevel(raw) });

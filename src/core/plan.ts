@@ -147,9 +147,9 @@ export interface SsmcsScParams {
 
 export interface SsmcsParams {
   on?: boolean; // SSMCS section ON (the [SSMCS] button)
-  // Preset index 1..34 (6 generic + 28 artist). UI/plan only — the device param
-  // is a string ("0001".") the numeric IPC cannot carry, so it is not in the
-  // write catalog and does not round-trip through readback.
+  // Preset index 1..34 (6 generic + 28 artist). The device param (91) is a 4-digit
+  // zero-padded string ("0001".."0034"), so it rides the string-write path
+  // (planToNameWrites / vd_set_str), not the numeric catalog. Round-trips via readback.
   sweetSpotData?: number;
   compDrive?: number; // raw 0..200 (display = raw/20, 0.00..10.00)
   morphing?: number; // raw 0..120

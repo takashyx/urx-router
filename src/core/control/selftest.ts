@@ -141,7 +141,20 @@ const ENUM_SWEEP: Record<string, number[]> = {
 // both repopulate the array on a type/selector change (sideEffect). The selector
 // itself (insertFx) is swept by sweepInsertFx; round-trip coverage for the engine
 // slots lives in the completeness / insert-fx-effect / translate unit tests.
-const SKIP = new Set(["insertFx", "insertFxParams", "autoMakeup", "oneKnob", "fxEffect"]);
+//
+// stereoLink / panBal are skipped too: stereoLink (Signal Type) is structural —
+// toggling it resets the secondary channel and rejects independent writes to it
+// while linked — and panBal is a 0/1 enum only meaningful while linked, so the
+// generic "+1" perturb drives it out of range. Both round-trip in value-coverage.
+const SKIP = new Set([
+  "insertFx",
+  "insertFxParams",
+  "autoMakeup",
+  "oneKnob",
+  "fxEffect",
+  "stereoLink",
+  "panBal",
+]);
 
 // Passes needed to sweep every enum option at least once (the largest is the
 // input insert-FX option list).
