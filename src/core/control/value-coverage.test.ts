@@ -9,11 +9,11 @@ import { getModel } from "../../models";
 import { emptyPlan, ensureFixedConnections, LEVEL_MAX_DB, LEVEL_OFF_DB, type Plan } from "../plan";
 import { ref } from "../../models/types";
 
-vi.mock("../platform", () => ({ vdGet: vi.fn() }));
+vi.mock("../platform", () => ({ vdGet: vi.fn(), vdGetStr: vi.fn() }));
 
-import { vdGet } from "../platform";
+import { vdGet, vdGetStr } from "../platform";
 import { applyDeviceState } from "./readback";
-import { planToCommands } from "./translate";
+import { planToCommands, planToNameWrites } from "./translate";
 import type { VdCommand } from "./translate";
 import {
   BUS_TYPE_OPTIONS,
@@ -52,6 +52,9 @@ function roundTrip(plan: Plan): Promise<Plan> {
     const k = `${id}:${x}:${y}`;
     return Promise.resolve(table.has(k) ? table.get(k)! : PORT_REF_PARAMS.has(id) ? PORT_REF_NONE : 0);
   });
+  const strTable = new Map<string, string>();
+  for (const w of planToNameWrites(model, plan)) strTable.set(`${w.param}:0:${w.y}`, w.value);
+  vi.mocked(vdGetStr).mockImplementation((id, x, y) => Promise.resolve(strTable.get(`${id}:${x}:${y}`) ?? ""));
   const out = emptyPlan("URX44V");
   return applyDeviceState(model, out).then(() => out);
 }
@@ -60,7 +63,10 @@ function cmd(plan: Plan, name: string, y: number): VdCommand | undefined {
   return planToCommands(model, plan).find((c) => c.name === name && c.y === y);
 }
 
-beforeEach(() => vi.mocked(vdGet).mockReset());
+beforeEach(() => {
+  vi.mocked(vdGet).mockReset();
+  vi.mocked(vdGetStr).mockReset();
+});
 
 describe("insert-FX: every option encodes and round-trips", () => {
   for (const opt of INSERT_FX_OPTIONS) {
@@ -83,6 +89,46 @@ describe("insert-FX: every option encodes and round-trips", () => {
       expect(back.nodeParams["bus.stereo"]?.insertFx).toBe(opt.value);
     });
   }
+});
+
+describe("new CH SETTING / MIX params round-trip", () => {
+  it("MIX → STEREO TO ST on/off", async () => {
+    for (const on of [true, false]) {
+      const plan = base();
+      plan.connections.find((c) => c.from === "bus.mix1:out" && c.to === "bus.stereo:in")!.params = { on };
+      const back = await roundTrip(plan);
+      const conn = back.connections.find((c) => c.from === "bus.mix1:out" && c.to === "bus.stereo:in");
+      expect(conn?.params?.on).toBe(on);
+    }
+  });
+
+  it("MIX Pan Link on/off", async () => {
+    for (const panLink of [true, false]) {
+      const plan = base();
+      plan.nodeParams["bus.mix1"] = { panLink };
+      const back = await roundTrip(plan);
+      expect(back.nodeParams["bus.mix1"]?.panLink).toBe(panLink);
+    }
+  });
+
+  it("Signal Type stereo link and PAN/BAL mode", async () => {
+    for (const [stereoLink, panBal] of [[true, 1], [false, 0]] as const) {
+      const plan = base();
+      plan.nodeParams["ch1"] = { stereoLink, panBal };
+      const back = await roundTrip(plan);
+      expect(back.nodeParams["ch1"]?.stereoLink).toBe(stereoLink);
+      expect(back.nodeParams["ch1"]?.panBal).toBe(panBal);
+    }
+  });
+
+  it("SSMCS Sweet Spot Data preset index", async () => {
+    for (const idx of [1, 2, 34]) {
+      const plan = base();
+      plan.nodeParams["ch1"] = { compEqType: 1, ssmcs: { sweetSpotData: idx } };
+      const back = await roundTrip(plan);
+      expect(back.nodeParams["ch1"]?.ssmcs?.sweetSpotData).toBe(idx);
+    }
+  });
 });
 
 describe("enum options round-trip", () => {

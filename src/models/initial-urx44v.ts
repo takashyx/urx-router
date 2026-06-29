@@ -32,6 +32,8 @@ export const URX44V_NODE_PARAMS: Record<string, NodeParams> = {
     comp: { threshold: -18, ratio: 3, gain: 2, attack: 34.58, release: 218, knee: 1, autoMakeup: false, oneKnob: false, oneKnobLevel: 0 },
     ssmcs: SSMCS_INITIAL,
     insertFx: -1,
+    stereoLink: false,
+    panBal: 0,
   },
   ch2: {
     on: true,
@@ -83,6 +85,8 @@ export const URX44V_NODE_PARAMS: Record<string, NodeParams> = {
     comp: { threshold: -18, ratio: 3, gain: 2, attack: 34.58, release: 218, knee: 1, autoMakeup: false, oneKnob: false, oneKnobLevel: 0 },
     ssmcs: SSMCS_INITIAL,
     insertFx: -1,
+    stereoLink: false,
+    panBal: 0,
   },
   ch4: {
     on: true,
@@ -191,6 +195,8 @@ export const URX44V_NODE_PARAMS: Record<string, NodeParams> = {
       { on: true, q: 0.71, freq: 4000, gain: 0 },
       { on: true, q: 0.71, freq: 10000, gain: 0, type: 1 },
     ],
+    on: true,
+    panLink: false,
   },
   "bus.mix2": {
     level: 0,
@@ -204,6 +210,8 @@ export const URX44V_NODE_PARAMS: Record<string, NodeParams> = {
       { on: true, q: 0.71, freq: 4000, gain: 0 },
       { on: true, q: 0.71, freq: 10000, gain: 0, type: 1 },
     ],
+    on: true,
+    panLink: false,
   },
   // FX channels ship ON at the factory (param 338, def 1) with their factory
   // effect program loaded — FX1 = Rev-X Hall (type 0), FX2 = Mono Delay (type
@@ -244,8 +252,8 @@ export const URX44V_NODE_PARAMS: Record<string, NodeParams> = {
     duckerOn: false,
     ducker: { threshold: -40, range: -24, attack: 20.17, decay: 1000 },
   },
-  "bus.mon1": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2 },
-  "bus.mon2": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2 },
+  "bus.mon1": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2, on: true },
+  "bus.mon2": { level: 0, cueInterrupt: true, mono: false, phonesLevel: 2, on: true },
   "bus.osc": {
     osc: { on: false, level: -14, mode: 0, freq: 1000, width: 0.1, interval: 1 },
   },

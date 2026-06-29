@@ -69,6 +69,7 @@ import {
   qToVd,
   ratioToVd,
   releaseToVd,
+  sweetSpotDataToStr,
   tagPortRef,
   vdSet,
 } from "./vd";
@@ -1004,9 +1005,14 @@ export function planToCommands(model: DeviceModel, plan: Plan): VdCommand[] {
       out.push(rawCommand("CH_PAN", cc.pan, "pan", cc.y, conn.params?.pan ?? 0));
     } else {
       const fxY = fxChannelIndex(fromId);
+      const mixL = MIX_FADER_INSTANCES[fromId]?.[0];
       if (fxY !== null) {
         out.push(rawCommand("FX_CHANNEL_FADER", PARAMS.FX_CHANNEL_FADER.id, "level", fxY, conn.params?.level ?? 0));
         out.push(rawCommand("FX_CHANNEL_BAL", PARAMS.FX_CHANNEL_BAL.id, "pan", fxY, conn.params?.pan ?? 0));
+      } else if (mixL !== undefined) {
+        // MIX 1/2 → STEREO "TO ST": an ON/OFF switch at the MIX's L instance (off
+        // by default, factory). No level/pan — the send is fixed routing.
+        out.push(command("TO_ST", mixL, (conn.params?.on ?? false) ? 1 : 0));
       }
     }
     own(fromId);
@@ -1089,8 +1095,9 @@ export function planToCommands(model: DeviceModel, plan: Plan): VdCommand[] {
         if (np.comp.oneKnobLevel !== undefined) out.push(command("COMP_ONE_KNOB_LEVEL", dyn.y, np.comp.oneKnobLevel));
       }
       // SSMCS detail (MONO IN, SSMCS mode). Comp/EQ section ON are emitted above
-      // via channelSections (compOn/eqOn). Sweet Spot Data is plan/UI-only (string
-      // param, outside the numeric catalog). All values raw.
+      // via channelSections (compOn/eqOn). Sweet Spot Data is a string param, so it
+      // rides the string-write path (collectSsmcsPresetWrites), not this numeric
+      // catalog. All values here raw.
       if (!dyn.comp && cc.hasMicStrip && (np.compEqType ?? COMP_EQ_COMP_FIRST) === COMP_EQ_SSMCS) {
         pushSsmcsCommands(out, dyn.y, np.ssmcs);
       }
@@ -1100,6 +1107,25 @@ export function planToCommands(model: DeviceModel, plan: Plan): VdCommand[] {
       for (const yi of cc.gain.instances) out.push(rawCommand("HA_GAIN", cc.gain.param, "gain", yi, np.gain));
     }
     own(node.id);
+  }
+
+  // MONO IN pair-level CH SETTING: Signal Type (stereo link) and PAN/BAL mode, both
+  // held on the pair's primary (odd) channel. Signal Type (23) writes BOTH channels'
+  // input indices (1 = STEREO link / 0 = MONO x2); PAN/BAL (891) writes the primary's
+  // index only (0 = PAN / 1 = BAL). Both reset dependent device state, so live must
+  // converge. Commands are attributed to the primary node.
+  for (const [primary, secondary] of model.channelPairs) {
+    const np = plan.nodeParams[primary];
+    if (!np) continue;
+    const py = channelControl(model, primary)?.y;
+    const sy = channelControl(model, secondary)?.y;
+    if (py === undefined) continue;
+    if (np.stereoLink !== undefined && sy !== undefined) {
+      out.push(command("SIGNAL_TYPE", py, np.stereoLink ? 1 : 0));
+      out.push(command("SIGNAL_TYPE", sy, np.stereoLink ? 1 : 0));
+    }
+    if (np.panBal !== undefined) out.push(command("PAN_BAL", py, np.panBal));
+    own(primary);
   }
 
   // Bus output faders: STEREO master (581, single) and MIX (674, L/R-linked).
@@ -1259,13 +1285,15 @@ export function planToCommands(model: DeviceModel, plan: Plan): VdCommand[] {
   }
 
   // BUS Type for MIX buses (587, L/R-linked): VARI / FIXED. A MIX-only attribute,
-  // written to both out instances.
+  // written to both out instances. Pan Link (589, VARI only) rides the same loop —
+  // a single switch at the MIX's L instance (sends' pan follows the source PAN).
   for (const node of model.nodes) {
     if (node.kind !== "bus") continue;
     const mix = MIX_FADER_INSTANCES[node.id];
-    const bt = plan.nodeParams[node.id]?.busType;
-    if (!mix || bt === undefined) continue;
-    for (const inst of mix) out.push(command("BUS_TYPE", inst, bt));
+    if (!mix) continue;
+    const np = plan.nodeParams[node.id];
+    if (np?.busType !== undefined) for (const inst of mix) out.push(command("BUS_TYPE", inst, np.busType));
+    if (np?.panLink !== undefined) out.push(command("PAN_LINK", mix[0], np.panLink ? 1 : 0));
     own(node.id);
   }
 
@@ -1358,6 +1386,18 @@ export function planToNameWrites(model: DeviceModel, plan: Plan): NameWrite[] {
     const nc = nameControl(model, node.id);
     if (!nc) continue;
     for (const y of nc.instances) out.push({ param: nc.param, y, value: name });
+  }
+  // SSMCS Sweet Spot Data preset (param 91): a 4-digit zero-padded string, so it
+  // rides this string-write path. MONO IN channels in SSMCS mode that carry an
+  // explicit preset index only; the device drives the rest of the strip from it.
+  for (const node of model.nodes) {
+    const np = plan.nodeParams[node.id];
+    const idx = np?.ssmcs?.sweetSpotData;
+    if (idx === undefined) continue;
+    if ((np?.compEqType ?? COMP_EQ_COMP_FIRST) !== COMP_EQ_SSMCS) continue;
+    const cc = channelControl(model, node.id);
+    if (!cc?.hasMicStrip) continue;
+    out.push({ param: PARAMS.SWEET_SPOT_DATA.id, y: cc.y, value: sweetSpotDataToStr(idx) });
   }
   return out;
 }

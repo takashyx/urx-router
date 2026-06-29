@@ -238,6 +238,58 @@ describe("planToCommands", () => {
     expect(master!.request.uri).toBe("/vd/parameters/582:0:0?operation=value");
   });
 
+  it("emits the MIX → STEREO TO ST switch at the MIX L instance", () => {
+    const plan = emptyPlan("URX44V");
+    ensureFixedConnections(model, plan);
+    const c1 = plan.connections.find((c) => c.from === "bus.mix1:out" && c.to === "bus.stereo:in")!;
+    c1.params = { on: true };
+    const c2 = plan.connections.find((c) => c.from === "bus.mix2:out" && c.to === "bus.stereo:in")!;
+    c2.params = { on: false };
+    const cmds = planToCommands(model, plan).filter((c) => c.name === "TO_ST");
+    expect(cmds.map((c) => `${c.request.uri}=${c.vdValue}`)).toEqual([
+      "/vd/parameters/677:0:0?operation=value=1",
+      "/vd/parameters/677:0:2?operation=value=0",
+    ]);
+  });
+
+  it("emits Pan Link at the MIX L instance", () => {
+    const plan = emptyPlan("URX44V");
+    ensureFixedConnections(model, plan);
+    plan.nodeParams["bus.mix1"] = { panLink: true };
+    plan.nodeParams["bus.mix2"] = { panLink: false };
+    const cmds = planToCommands(model, plan).filter((c) => c.name === "PAN_LINK");
+    expect(cmds.map((c) => `${c.request.uri}=${c.vdValue}`)).toEqual([
+      "/vd/parameters/589:0:0?operation=value=1",
+      "/vd/parameters/589:0:2?operation=value=0",
+    ]);
+  });
+
+  it("emits Signal Type to both channels of a pair and PAN/BAL to the primary", () => {
+    const plan = emptyPlan("URX44V");
+    ensureFixedConnections(model, plan);
+    plan.nodeParams["ch1"] = { stereoLink: true, panBal: 1 };
+    const sig = planToCommands(model, plan).filter((c) => c.name === "SIGNAL_TYPE");
+    expect(sig.map((c) => c.request.uri)).toEqual([
+      "/vd/parameters/23:0:0?operation=value",
+      "/vd/parameters/23:0:1?operation=value",
+    ]);
+    const pb = planToCommands(model, plan).filter((c) => c.name === "PAN_BAL");
+    expect(pb).toHaveLength(1);
+    expect(pb[0].request.uri).toBe("/vd/parameters/891:0:0?operation=value");
+    expect(pb[0].vdValue).toBe(1);
+  });
+
+  it("emits SSMCS Sweet Spot Data as a 4-digit string write", () => {
+    const plan = emptyPlan("URX44V");
+    ensureFixedConnections(model, plan);
+    plan.nodeParams["ch1"] = { compEqType: 1, ssmcs: { sweetSpotData: 2 } };
+    const writes = planToNameWrites(model, plan).filter((w) => w.param === 91);
+    expect(writes).toEqual([{ param: 91, y: 0, value: "0002" }]);
+    // COMP->EQ mode (not SSMCS) emits no preset write.
+    plan.nodeParams["ch1"] = { compEqType: 0, ssmcs: { sweetSpotData: 2 } };
+    expect(planToNameWrites(model, plan).filter((w) => w.param === 91)).toEqual([]);
+  });
+
   it("emits a mono CH → MIX send on both L/R instances with tap", () => {
     const plan = emptyPlan("URX44V");
     ensureFixedConnections(model, plan);

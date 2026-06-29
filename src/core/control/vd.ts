@@ -150,6 +150,23 @@ export const SSMCS_COMP_INTERNAL_MAX = 200;
 export const SSMCS_EQ_LOW_FREQ_RAW_MAX = 72;
 export const SSMCS_EQ_HIGH_FREQ_RAW_MIN = 60;
 
+/** SSMCS Sweet Spot Data preset count (6 generic + 28 artist). */
+export const SWEET_SPOT_DATA_MAX = 34;
+/** SSMCS Sweet Spot Data preset index (1 … 34) → the device's 4-digit zero-padded
+ *  string ("0001" … "0034"). Out-of-range clamps into [1, 34] (the device clamps
+ *  "0035"+ to "0001"; we instead keep a valid in-range index). */
+export function sweetSpotDataToStr(index: number): string {
+  const n = Math.min(SWEET_SPOT_DATA_MAX, Math.max(1, Math.round(index)));
+  return String(n).padStart(4, "0");
+}
+/** Device Sweet Spot Data string ("0001" …) → preset index (1 … 34). A blank or
+ *  unparseable value falls back to 1 ("01 Basic", the factory default). */
+export function strToSweetSpotData(value: string): number {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(SWEET_SPOT_DATA_MAX, n);
+}
+
 /** SSMCS Comp Drive raw → display (0.00 … 10.00). */
 export function ssmcsCompDrive(raw: number): number {
   return raw / 20;
