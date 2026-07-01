@@ -12,7 +12,7 @@ import { LEVEL_MAX_DB, LEVEL_MIN_DB, LEVEL_OFF_DB, type NodeParams, type Plan, t
 import { LEVEL_POS_MAX, levelToPos, posToLevel, stepLevel } from "../core/levels";
 import { defaultTapKey, hasMeter, METER_FLOOR_DB, METER_GREEN_TOP_DB, METER_YELLOW_TOP_DB, MeterStore, subscribeMeters, tapAddrs, tapFor, tapsFor, type MeterTap } from "../core/meters";
 import { loadJson, saveJson } from "../core/storage";
-import { channelControl, insertFxControl } from "../core/control/translate";
+import { busBalance, channelControl, insertFxControl } from "../core/control/translate";
 import { isBalLinkedPair, mirrorBalPair, mixSendLocks, partnerChannel, sendTapWritable } from "../core/routing";
 import { INSERT_FX_NONE, type InsertFxOption } from "../core/control/params";
 import { PAN_MAX, PAN_MIN, PHONES_LEVEL_DEFAULT, PHONES_LEVEL_MAX, PHONES_LEVEL_MIN } from "../core/control/vd";
@@ -912,6 +912,14 @@ export class Console {
         this.addSendPanKnob(head, m.id, target, m.isBalance ? "BAL" : "PAN", panLinked ? t().inspector.panLinked : undefined);
       }
     }
+    // Master balance (STEREO 583 / MIX 676) = the bus output's L/R balance, edited
+    // on the node's own `pan`. `busBalance` is the single source of truth for which
+    // buses have one (shared with the inspector / translate / readback). The device
+    // keeps the BALANCE label even under Pan Link (confirmed on URX44V), so it is
+    // always "BAL". Only shown in MAIN (these strips are not send sources).
+    if (!usesSend && busBalance(m.id)) {
+      this.addNodePanKnob(head, m.id, "BAL");
+    }
     if (m.hasPhones) {
       // PHONES output level: a 0.0..10.0 scale (not dB) on the monitor bus,
       // independent of the monitor fader (PHONES 1 ↔ mon1, PHONES 2 ↔ mon2).
@@ -1237,24 +1245,34 @@ export class Console {
     return () => this.sendConn(this.hooks.getPlan(), id, target);
   }
 
+  /** Shared PAN/BALANCE knob spec (±63, C / Ln / Rn display); get/set/reset bind
+   *  the source — a connection's send pan or a node's master balance. */
+  private panKnobSpec(get: () => number, set: (v: number) => void, reset: number, readonlyTitle?: string): KnobSpec {
+    return { get, set, min: PAN_MIN, max: PAN_MAX, step: 1, format: (v) => (v === 0 ? "C" : v < 0 ? "L" + -v : "R" + v), reset, readonlyTitle };
+  }
+
   /** Add a PAN/BALANCE knob bound to a send connection's `pan` (L63 – C – R63),
    *  resetting to the factory plan's value on double-click. */
   private addSendPanKnob(head: HTMLElement, id: string, target: string, label: string, readonlyTitle?: string): void {
     const conn = (): PlanConnection | undefined => this.sendConn(this.hooks.getPlan(), id, target);
     const factory = this.sendConn(this.factoryPlan(), id, target)?.params?.pan ?? 0;
-    this.addKnob(head, label, {
-      get: () => conn()?.params?.pan ?? 0,
-      set: (v) => {
-        const c = conn();
-        if (c) c.params = { ...c.params, pan: v };
-      },
-      min: PAN_MIN,
-      max: PAN_MAX,
-      step: 1,
-      format: (v) => (v === 0 ? "C" : v < 0 ? "L" + -v : "R" + v),
-      reset: factory,
+    this.addKnob(head, label, this.panKnobSpec(
+      () => conn()?.params?.pan ?? 0,
+      (v) => { const c = conn(); if (c) c.params = { ...c.params, pan: v }; },
+      factory,
       readonlyTitle,
-    }, id);
+    ), id);
+  }
+
+  /** Add a BALANCE/PAN knob bound to a bus node's own master balance (`pan`,
+   *  STEREO 583 / MIX 676), resetting to the factory plan's value on double-click. */
+  private addNodePanKnob(head: HTMLElement, id: string, label: string): void {
+    const factory = this.factoryPlan().nodeParams[id]?.pan ?? 0;
+    this.addKnob(head, label, this.panKnobSpec(
+      () => this.hooks.getPlan().nodeParams[id]?.pan ?? 0,
+      (v) => void (this.nodeParamsOf(id).pan = v),
+      factory,
+    ), id);
   }
 
   private nodeParamsOf(id: string): NodeParams {

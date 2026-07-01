@@ -40,6 +40,22 @@ test("FIXED bus drops the send LEVEL and shows a hint", async ({ page }) => {
   await expect(page.locator("#inspector .hint", { hasText: "Send level is fixed" })).toHaveCount(1);
 });
 
+// A .param whose label is EXACTLY `label` (so "Pan" never matches "Pan Link").
+const paramExact = (page: Page, label: string) =>
+  page.locator("#inspector .param", { has: page.getByText(label, { exact: true }) });
+
+test("STEREO / MIX master expose a Balance control that stays Balance under Pan Link", async ({ page }) => {
+  await node(page, "bus.stereo").click();
+  await expect(paramExact(page, "Balance")).toHaveCount(1);
+
+  await node(page, "bus.mix1").click();
+  await expect(paramExact(page, "Balance")).toHaveCount(1);
+  // The device keeps the BALANCE label even with Pan Link on (confirmed on URX44V).
+  await param(page, "Pan Link").locator("button", { hasText: "ON" }).click();
+  await expect(paramExact(page, "Balance")).toHaveCount(1);
+  await expect(paramExact(page, "Pan")).toHaveCount(0);
+});
+
 test("VARI + Pan Link drops the send PAN and shows a hint", async ({ page }) => {
   await node(page, "bus.mix1").click();
   await param(page, "Pan Link").locator("button", { hasText: "ON" }).click();

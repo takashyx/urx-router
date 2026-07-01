@@ -424,6 +424,17 @@ export function busFader(nodeId: string): BusFader | null {
   return mix ? { name: "OUT_FADER", param: PARAMS.OUT_FADER.id, instances: mix } : null;
 }
 
+/** Output master balance / pan for a bus node: STEREO master (583, single) or a
+ *  MIX bus (676, L/R-linked per MIX), mirroring the fader's instances. Null for
+ *  buses with no master balance (FX / monitor / stream / osc). */
+export function busBalance(nodeId: string): BusFader | null {
+  if (nodeId === "bus.stereo") {
+    return { name: "STEREO_MASTER_BAL", param: PARAMS.STEREO_MASTER_BAL.id, instances: [0] };
+  }
+  const mix = MIX_FADER_INSTANCES[nodeId];
+  return mix ? { name: "OUT_MASTER_BAL", param: PARAMS.OUT_MASTER_BAL.id, instances: mix } : null;
+}
+
 /** Master ON param/instances for a bus channel: STEREO master (582), a MIX bus
  *  (OUT_MASTER_ON 675, L/R-linked per MIX), or an FX return (FX_CHANNEL_ON, one
  *  instance per FX; the canonical FX-bus ordering), or null for buses with none. */
@@ -1145,6 +1156,16 @@ export function planToCommands(model: DeviceModel, plan: Plan): VdCommand[] {
     const np = plan.nodeParams[node.id];
     if (!bf || np?.level === undefined) continue;
     for (const yi of bf.instances) out.push(rawCommand(bf.name, bf.param, "level", yi, np.level));
+    own(node.id);
+  }
+
+  // Bus master balance / pan: STEREO master (583, single) and MIX (676, L/R-linked).
+  for (const node of model.nodes) {
+    if (node.kind !== "bus") continue;
+    const bb = busBalance(node.id);
+    const np = plan.nodeParams[node.id];
+    if (!bb || np?.pan === undefined) continue;
+    for (const yi of bb.instances) out.push(rawCommand(bb.name, bb.param, "pan", yi, np.pan));
     own(node.id);
   }
 

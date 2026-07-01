@@ -263,6 +263,22 @@ describe("planToCommands", () => {
     expect(master!.request.uri).toBe("/vd/parameters/582:0:0?operation=value");
   });
 
+  it("emits master balance for STEREO (583 single) and MIX (676 L/R-linked)", () => {
+    const plan = emptyPlan("URX44V");
+    ensureFixedConnections(model, plan);
+    plan.nodeParams["bus.stereo"] = { pan: -20 };
+    plan.nodeParams["bus.mix1"] = { pan: 30 };
+    const cmds = planToCommands(model, plan);
+    const st = cmds.find((c) => c.name === "STEREO_MASTER_BAL");
+    expect(st!.vdValue).toBe(-20);
+    expect(st!.request.uri).toBe("/vd/parameters/583:0:0?operation=value");
+    const mix = cmds.filter((c) => c.name === "OUT_MASTER_BAL");
+    expect(mix.map((c) => `${c.request.uri}=${c.vdValue}`)).toEqual([
+      "/vd/parameters/676:0:0?operation=value=30",
+      "/vd/parameters/676:0:1?operation=value=30",
+    ]);
+  });
+
   it("emits the MIX → STEREO TO ST switch at the MIX L instance", () => {
     const plan = emptyPlan("URX44V");
     ensureFixedConnections(model, plan);
