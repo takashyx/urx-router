@@ -63,6 +63,23 @@ test("switching a mono channel to SSMCS swaps in the morphing-strip controls", a
   await expect(eqSection).toHaveAttribute("open", ""); // EQ on → open
 });
 
+test("re-entering an SSMCS/COMP->EQ mode resets that bank to factory", async ({ page }) => {
+  // The device treats the two chains as exclusive and reloads the destination
+  // chain's factory values on every switch; the planner mirrors that offline.
+  await node(page, "ch1").click();
+  const sel = typeSelect(page);
+  await sel.selectOption("1"); // SSMCS
+  const ssd = param(page, "Sweet Spot Data").locator("select");
+  await expect(ssd).toHaveValue("1"); // factory "01 Basic"
+  await ssd.selectOption("14"); // 08 MR Vocal
+  await expect(ssd).toHaveValue("14");
+
+  // Leave SSMCS and come back: the morphing strip reloads factory, not "08 MR Vocal".
+  await sel.selectOption("0"); // COMP->EQ
+  await sel.selectOption("1"); // SSMCS again
+  await expect(param(page, "Sweet Spot Data").locator("select")).toHaveValue("1");
+});
+
 test("SSMCS is a MONO IN feature — stereo channels have no COMP/EQ Type", async ({ page }) => {
   await node(page, "ch_5_6").click();
   await expect(typeSelect(page)).toHaveCount(0);

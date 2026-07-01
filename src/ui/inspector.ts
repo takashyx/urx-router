@@ -419,23 +419,17 @@ export function renderInspector(
         );
       }
       // COMP/EQ type (COMP->EQ vs SSMCS) — the CH SETTING bank selector that drives
-      // which COMP/EQ controls appear below. MONO IN channels only. Each type's
-      // bank is separate on the device, so switching seeds the target bank's
-      // initial section state: SSMCS = COMP/EQ on + every value reset to
-      // SSMCS_INITIAL; COMP->EQ = COMP off / EQ on (the device factory default).
+      // which COMP/EQ controls appear below. MONO IN channels only. Each type's bank
+      // is separate on the device and reloaded to factory on every switch; the app
+      // wiring resets the destination bank (see resetCompEqBank in main.ts), so the
+      // selector only declares the new type here.
       if (cc?.hasMicStrip) {
         input.append(
           selectControl(
             m.inspector.compEqType,
             COMP_EQ_OPTIONS.map((o) => ({ value: String(o.value), label: o.label })),
             String(compEqType),
-            (v) =>
-              actions.onUpdateNodeParams(
-                node.id,
-                Number(v) === COMP_EQ_SSMCS
-                  ? { compEqType: COMP_EQ_SSMCS, compOn: true, eqOn: true, ssmcs: structuredClone(SSMCS_INITIAL) }
-                  : { compEqType: COMP_EQ_COMP_FIRST, compOn: false, eqOn: true },
-              ),
+            (v) => actions.onUpdateNodeParams(node.id, { compEqType: Number(v) }),
           ),
         );
       }
