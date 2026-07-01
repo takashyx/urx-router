@@ -198,6 +198,11 @@ dotted line** so the live routing stands out, and a toolbar **"Hide off sends"**
     console shows it read-only — when the master is off the MIX strip dims and gets a CH MUTE tag (the same
     indicator a send tab uses for a channel whose master is off). The STEREO / MIX inspector toggles sit at the
     top of the Parameters section under the same "Channel" label as an FX channel.
+  - The STEREO master and each MIX bus also carry a **master BALANCE** — the bus output's L/R balance
+    (±63, centre 0; STEREO param 583, MIX 676 with the L/R instances linked per bus). It is edited in the
+    graph inspector (below the fader) and on the CONSOLE master / MIX strip (a `BAL` knob). The device keeps
+    the **BALANCE** label even with Pan Link on: Pan Link ties each *send's* pan to its source channel, which
+    is independent of the bus output balance.
 - OSCILLATOR → STEREO / MIX 1–2 / FX 1–2 (`sendSwitch`; an ON/OFF assign, not a
   summing send — the oscillator has one global level. Stereo destinations carry
   independent L/R in the wire (`oscL` / `oscR`); FX buses are mono)

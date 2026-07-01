@@ -218,6 +218,11 @@ export const PARAMS = {
   HA_GAIN: { id: 1, axis: "input", encoding: "gain", follow: "direct" },
   /** Output (mix) fader level. */
   OUT_FADER: { id: 674, axis: "output", encoding: "level", follow: "direct" },
+  /** MIX bus master balance (676, fader+2, parallel to STEREO_MASTER_BAL 583). The
+   *  bus output's L/R balance; ±63, default 0. L/R-linked per stereo MIX (MIX1 [0,1]
+   *  / MIX2 [2,3]). Confirmed live (snapshot-diff: MIX1 balance → 676:0:0/0:1, and
+   *  the device keeps the BALANCE label even under Pan Link). */
+  OUT_MASTER_BAL: { id: 676, axis: "output", encoding: "pan", follow: "direct" },
   /** MIX bus BUS Type: 0 = VARI (variable per-send level) / 1 = FIXED. L/R-linked
    *  (written to both out instances). Confirmed by live snapshot-diff (MIX1 0 → 1). */
   BUS_TYPE: { id: 587, axis: "output", encoding: "enum" },
@@ -302,6 +307,10 @@ export const PARAMS = {
   STEREO_MASTER_FADER: { id: 581, axis: "global", encoding: "level", follow: "direct" },
   /** STEREO master ON (y = 0). */
   STEREO_MASTER_ON: { id: 582, axis: "global", encoding: "bool", follow: "direct" },
+  /** STEREO master balance (y = 0): the STEREO output's L/R balance, ±63, default 0.
+   *  Parallel to the fader (581) / ON (582) block. Confirmed live (snapshot-diff:
+   *  STEREO balance → 583:0:0, positive = R). */
+  STEREO_MASTER_BAL: { id: 583, axis: "global", encoding: "pan", follow: "direct" },
   /** FX channel ON (y = FX1 0 / FX2 1). The FX channel reuses the input
    *  channel-strip layout one block earlier (139 fader / 140 ON / 141 pan ↔
    *  337 / 338 / 339); confirmed by live read (FX1/FX2 hold independent states). */

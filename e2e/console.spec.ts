@@ -87,6 +87,37 @@ test("PAN/BAL is a knob on channels; PHONES on monitor buses", async ({ page }) 
   await expect(strip(page, "MONITOR 1").locator(".con-knob[aria-label='PHONES']")).toBeVisible();
 });
 
+test("STEREO master and MIX strips carry a master BAL knob", async ({ page }) => {
+  const master = strip(page, "STEREO (MAIN)").locator(".con-knob[aria-label='BAL']");
+  await expect(master).toBeVisible();
+  await expect(strip(page, "MIX 1").locator(".con-knob[aria-label='BAL']")).toBeVisible();
+  // The knob edits and double-click resets to the factory value (center = C).
+  const val = strip(page, "STEREO (MAIN)")
+    .locator(".con-gain", { has: page.locator(".con-knob[aria-label='BAL']") })
+    .locator(".val");
+  await expect(val).toHaveText("C");
+  await master.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(val).toHaveText("R1");
+  await master.dblclick();
+  await expect(val).toHaveText("C");
+});
+
+test("the MIX master BAL knob stays labeled BAL under Pan Link", async ({ page }) => {
+  await expect(strip(page, "MIX 1").locator(".con-knob[aria-label='BAL']")).toBeVisible();
+  // The device keeps the BALANCE label even with Pan Link on (confirmed on URX44V).
+  await page.click("#btn-view-graph");
+  await page.locator('g.node[data-id="bus.mix1"]').click();
+  await page
+    .locator("#inspector .param")
+    .filter({ hasText: "Pan Link" })
+    .getByRole("button", { name: "ON", exact: true })
+    .click();
+  await page.click("#btn-view-console");
+  await expect(strip(page, "MIX 1").locator(".con-knob[aria-label='BAL']")).toBeVisible();
+  await expect(strip(page, "MIX 1").locator(".con-knob[aria-label='PAN']")).toHaveCount(0);
+});
+
 test("DUCKER and φL/φR appear on stereo channels only", async ({ page }) => {
   await expect(strip(page, "CH 5/6").getByRole("button", { name: "DUCKER" })).toBeVisible();
   await expect(strip(page, "CH 5/6").getByRole("button", { name: "φL" })).toBeVisible();

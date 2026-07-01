@@ -263,6 +263,9 @@ export interface NodeParams {
   gain?: number;
   /** A node-level fader in dB (e.g. monitor level). Absent = device default. */
   level?: number;
+  /** Output bus master balance (STEREO 583 / MIX 676): the bus output's L/R
+   *  balance, signed ±63 (L63 … C=0 … R63). Absent = center (0). */
+  pan?: number;
   /** Oscillator generator settings (the bus.osc node). */
   osc?: OscParams;
   /** Monitor CUE interrupt (monitor buses). Absent or true = on (device default). */

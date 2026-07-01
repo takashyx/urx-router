@@ -111,6 +111,15 @@ describe("new CH SETTING / MIX params round-trip", () => {
     }
   });
 
+  it("STEREO / MIX master balance round-trips", async () => {
+    for (const [id, pan] of [["bus.stereo", -20], ["bus.mix1", 30], ["bus.mix2", -63]] as const) {
+      const plan = base();
+      plan.nodeParams[id] = { ...plan.nodeParams[id], pan };
+      const back = await roundTrip(plan);
+      expect(back.nodeParams[id]?.pan).toBe(pan);
+    }
+  });
+
   it("Signal Type stereo link and PAN/BAL mode", async () => {
     for (const [stereoLink, panBal] of [[true, 1], [false, 0]] as const) {
       const plan = base();

@@ -40,6 +40,7 @@ import {
 import { isBalLinkedPair, isFixedConnection, mixSendLocks, pairPrimary, sendHasOn, sendHasTap, sendTapWritable } from "../core/routing";
 import type { DynField, EqControl } from "../core/control/translate";
 import {
+  busBalance,
   busEqOn,
   busFader,
   busMasterOn,
@@ -497,6 +498,14 @@ export function renderInspector(
       ps.body.append(
         faderControl(np.level ?? 0, (v) => actions.onUpdateNodeParams(node.id, { level: v })),
       );
+      // Master balance (STEREO 583 / MIX 676): the bus output's L/R balance. The
+      // device keeps the BALANCE label even under Pan Link (confirmed on URX44V),
+      // so it is always "Balance".
+      if (busBalance(node.id)) {
+        ps.body.append(
+          balanceControl(m.inspector.balance, np.pan ?? 0, (v) => actions.onUpdateNodeParams(node.id, { pan: v })),
+        );
+      }
       host.append(ps.el);
       // Insert FX (STEREO / MIX outputs) groups into the Parameters section.
       tailBody = ps.body;
@@ -1651,6 +1660,11 @@ function levelSlider(label: string, cur: number, onChange: (v: number) => void):
 // is the -∞ / off position.
 function faderControl(cur: number, onChange: (v: number) => void): HTMLElement {
   return levelSlider(t().inspector.level, cur, onChange);
+}
+
+// Node-level bus master balance (STEREO 583 / MIX 676): signed ±63, center 0.
+function balanceControl(label: string, cur: number, onChange: (v: number) => void): HTMLElement {
+  return rangeSlider(label, PAN_MIN, PAN_MAX, 1, cur, formatPan, onChange);
 }
 
 // A two-button ON/OFF toggle for a node-level boolean (channel on, HPF), styled

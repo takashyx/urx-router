@@ -22,6 +22,7 @@ import {
 import { insertFxEngine, insertFxFamilyOf, insertFxWritableSlots } from "./insert-fx-effect";
 import type { DynField, EqControl, EqOneKnobControl } from "./translate";
 import {
+  busBalance,
   busEqOn,
   busFader,
   busMasterOn,
@@ -299,8 +300,11 @@ export async function applyDeviceState(
     if (!bf) continue;
     attempted.add(node.id);
     try {
-      const level = vdToLevel(await vdGet(bf.param, 0, bf.instances[0]));
-      plan.nodeParams[node.id] = { ...plan.nodeParams[node.id], level };
+      const next: NodeParams = { ...plan.nodeParams[node.id], level: vdToLevel(await vdGet(bf.param, 0, bf.instances[0])) };
+      // Master balance (STEREO 583 / MIX 676): same instance layout as the fader.
+      const bb = busBalance(node.id);
+      if (bb) next.pan = vdToPan(await vdGet(bb.param, 0, bb.instances[0]));
+      plan.nodeParams[node.id] = next;
       applied++;
     } catch (e) {
       failed.add(node.id);
@@ -726,6 +730,10 @@ export function applyDirect(plan: Plan, node: string, name: ParamName, raw: numb
     case "STEREO_MASTER_FADER":
     case "MONITOR_LEVEL":
       setNp({ level: vdToLevel(raw) });
+      return true;
+    case "OUT_MASTER_BAL":
+    case "STEREO_MASTER_BAL":
+      setNp({ pan: vdToPan(raw) });
       return true;
     case "PAN_LINK":
       setNp({ panLink: vdToBool(raw) });
