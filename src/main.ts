@@ -6,7 +6,7 @@ import type { ModelId } from "./models/types";
 import { parseRef } from "./models/types";
 import { mirrorBalPair, validatePlan } from "./core/routing";
 import type { PlanProblem } from "./core/routing";
-import { decodePlanParam, deserialize, emptyPlan, ensureFixedConnections, PlanError, serialize } from "./core/plan";
+import { decodePlanParam, deserialize, emptyPlan, ensureFixedConnections, PlanError, serialize, SSMCS_INITIAL } from "./core/plan";
 import type { ConnParams, NodeParams, Plan } from "./core/plan";
 import { formatRate, rateConstraints, SAMPLE_RATES } from "./core/constraints";
 import {
@@ -20,7 +20,7 @@ import {
   saveTextDocument,
 } from "./core/storage";
 import type { RecentEntry } from "./core/storage";
-import { PAN_BAL_BAL, PAN_BAL_PAN, STEREO_PAN_DEFAULT } from "./core/control/params";
+import { COMP_EQ_SSMCS, PAN_BAL_BAL, PAN_BAL_PAN, STEREO_PAN_DEFAULT } from "./core/control/params";
 import { Graph } from "./ui/graph";
 import type { LabelSource, Selection, ThemeName } from "./ui/graph";
 import { renderInspector } from "./ui/inspector";
@@ -486,6 +486,41 @@ function resetStereoSendPans(primary: string): void {
   });
 }
 
+// SSMCS and COMP->EQ are exclusive on a MONO IN channel and share the DSP: on the
+// device, switching COMP_EQ_TYPE loads the destination chain's factory values (the
+// previous chain's edits are not carried across, so re-entering a chain always
+// starts from factory). Mirror that offline so the plan never holds stale bank
+// values the device would have reset. Only the destination bank is reset; the
+// source bank's now-dormant values are harmless (re-entering it resets them too).
+// GATE is type-independent and untouched. Live sync converges the same reset via
+// follow's scoped read-back (COMP_EQ_TYPE is a sideEffect param).
+function resetCompEqBank(id: string, newType: number): void {
+  const np = plan.nodeParams[id];
+  if (!np) return;
+  const factory = defaultPlan(modelId).nodeParams[id] ?? {};
+  if (newType === COMP_EQ_SSMCS) {
+    // Entering SSMCS: load the factory morphing strip ("01 Basic", fully engaged).
+    np.ssmcs = structuredClone(factory.ssmcs ?? SSMCS_INITIAL);
+    np.compOn = true;
+    np.eqOn = true;
+  } else {
+    // Entering COMP->EQ: restore the factory comp / 4-band EQ / EQ 1-knob bank and
+    // its section ONs. A field absent at the factory is cleared, not left stale.
+    assignOrDelete(np, "comp", factory.comp);
+    assignOrDelete(np, "eqBands", factory.eqBands);
+    assignOrDelete(np, "eqOneKnob", factory.eqOneKnob);
+    np.compOn = factory.compOn ?? false;
+    np.eqOn = factory.eqOn ?? true;
+  }
+}
+
+// Set a node param from the factory value, deleting it when the factory has none,
+// so a reset never leaves a stale field behind (clone to keep the factory pristine).
+function assignOrDelete<K extends keyof NodeParams>(np: NodeParams, key: K, value: NodeParams[K]): void {
+  if (value === undefined) delete np[key];
+  else np[key] = structuredClone(value);
+}
+
 const inspectorActions = {
   onDeleteConnection: (from: string, to: string) => graph.deleteConnection(from, to),
   // Mutate params in place without re-rendering, so the slider keeps focus while dragging.
@@ -538,6 +573,9 @@ const inspectorActions = {
     // Toggling PAN/BAL (or entering STEREO) re-initializes every bus send's pan
     // for the linked pair: PAN hard-pans odd/even L/R, BAL centres them.
     if (patch.panBal !== undefined || patch.stereoLink === true) resetStereoSendPans(id);
+    // Switching COMP/EQ type resets the destination chain to factory (the device
+    // does the same — the SSMCS ⇄ COMP->EQ banks are exclusive and not preserved).
+    if (patch.compEqType !== undefined && patch.compEqType !== prev?.compEqType) resetCompEqBank(id, patch.compEqType);
     // An EQ band's filter type / ON changes which controls show (Q, gain), so it
     // needs a re-render; a freq/Q/gain slick must NOT re-render (it keeps slider
     // focus). Detect a relayout by diffing the changed bands' type/on.

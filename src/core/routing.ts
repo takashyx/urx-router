@@ -6,7 +6,7 @@ import { isSingleInput, parseRef, ref } from "../models/types";
 import type { DeviceModel, RoutingRule } from "../models/types";
 import type { Plan, PlanConnection } from "./plan";
 import { hasConnection } from "./plan";
-import { PAN_BAL_BAL, PAN_BAL_PAN } from "./control/params";
+import { BUS_TYPE_FIXED, BUS_TYPE_VARI, PAN_BAL_BAL, PAN_BAL_PAN } from "./control/params";
 
 // Language-agnostic failure codes. The UI maps these to localized messages so
 // core stays free of any i18n dependency.
@@ -48,6 +48,20 @@ export function sendHasTap(model: DeviceModel, from: string, to: string): boolea
 export function sendHasOn(model: DeviceModel, from: string, to: string): boolean {
   if (sendHasTap(model, from, to)) return true;
   return isFixedConnection(model, from, to) && parseRef(to).nodeId === "bus.stereo";
+}
+
+// The two MIX-bus "hidden mode" locks that gate a send's controls, resolved from
+// the destination bus's node params: FIXED BUS Type makes the send level a fixed
+// value (the LEVEL control is inert) and Pan Link (VARI only) ties each send pan to
+// the source channel PAN (the PAN control is inert). Only MIX 1 / MIX 2 carry these;
+// any other destination returns both false. Shared by the inspector (which drops the
+// gated controls) and the console (which renders them read-only).
+export function mixSendLocks(plan: Plan, destId: string): { busFixed: boolean; panLinked: boolean } {
+  const np = plan.nodeParams[destId];
+  const isMix = destId === "bus.mix1" || destId === "bus.mix2";
+  const busFixed = isMix && (np?.busType ?? BUS_TYPE_VARI) === BUS_TYPE_FIXED;
+  const panLinked = isMix && !busFixed && np?.panLink === true;
+  return { busFixed, panLinked };
 }
 
 // Whether a send's PRE/POST tap can be written to the device from software — the

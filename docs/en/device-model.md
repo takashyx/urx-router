@@ -170,7 +170,8 @@ dotted line** so the live routing stands out, and a toolbar **"Hide off sends"**
 > default and what the tool models) or FIXED (a fixed send level — sends into the bus carry no
 > adjustable LEVEL). **Pan Link** (VARI only) ties each send's PAN to the source channel PAN, so the
 > per-send PAN is no longer independent. Stored on the MIX bus node; the connection panel hides the
-> LEVEL (FIXED) or PAN (Pan Link) accordingly and shows a short note.
+> LEVEL (FIXED) or PAN (Pan Link) accordingly and shows a short note. The console applies the same
+> locks in that MIX send tab, rendering the send fader (FIXED) or pan knob (Pan Link) read-only.
 
 > On the canvas a PRE MIX/FX send is drawn **dashed with an amber "PRE" tap marker just after the
 > source**, so it is visible without selecting the connection. POST (the default) is solid and unmarked.
@@ -296,10 +297,12 @@ Source selection for the analog outputs (MAIN / LINE).
   Ratio / Knee plus a side-chain filter (Q / Freq / Gain), and its EQ is **3-band (Low shelf / Mid
   peaking / High shelf)** — not the 4-band PEQ. ST IN has no SSMCS (always EQ only). The inspector
   swaps the COMP/EQ sections for the SSMCS sections per the type, with the SSMCS Main section between
-  GATE and COMP. SSMCS and COMP->EQ are separate banks on the device, so switching the type seeds the
-  target bank's factory section state: SSMCS turns COMP/EQ on and resets every value to the device
-  initial; COMP->EQ resets to COMP off / EQ on (keeping the COMP->EQ values). The initial values are
-  read from a real MONO IN SSMCS bank with the default "01 Basic" preset loaded.
+  GATE and COMP. SSMCS and COMP->EQ are separate banks on the device that are not preserved across a
+  switch, so switching the type reloads the destination bank to factory (matching the device — the
+  previous bank's edits are gone, and re-entering a bank always starts from factory): SSMCS turns
+  COMP/EQ on and resets every value to the device initial; COMP->EQ resets to COMP off / EQ on and
+  reloads the factory comp / 4-band EQ / EQ 1-knob values. GATE is type-independent and untouched. The
+  SSMCS initial values are read from a real MONO IN SSMCS bank with the default "01 Basic" preset loaded.
 - Every EQ (input channels and output STEREO / MIX buses) has a **1-knob** mode where one knob drives
   the whole 4-band PEQ: an **on/off**, a preset **type**, and a **level** (effect depth 0–100 %). The
   type is a shared preset whose dropdown shows only the applicable subset — **Intensity / Vocal** on

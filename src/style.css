@@ -2132,6 +2132,13 @@ select:focus-visible,
   outline-offset: 1px;
   border-radius: 3px;
 }
+/* A device-locked control (FIXED-bus send level / Pan-Link send pan): shows its
+   value but dimmed and non-interactive, mirroring the graph inspector. */
+.con-fader.readonly,
+.con-knob.readonly {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 
 /* Two-cell readout: fader set level (white) + live meter value of the selected tap
    (amber). Single cell when the node has no meter. */

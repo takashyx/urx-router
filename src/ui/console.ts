@@ -13,7 +13,7 @@ import { LEVEL_POS_MAX, levelToPos, posToLevel, stepLevel } from "../core/levels
 import { defaultTapKey, hasMeter, METER_FLOOR_DB, METER_GREEN_TOP_DB, METER_YELLOW_TOP_DB, MeterStore, subscribeMeters, tapAddrs, tapFor, tapsFor, type MeterTap } from "../core/meters";
 import { loadJson, saveJson } from "../core/storage";
 import { channelControl, insertFxControl } from "../core/control/translate";
-import { isBalLinkedPair, mirrorBalPair, partnerChannel, sendTapWritable } from "../core/routing";
+import { isBalLinkedPair, mirrorBalPair, mixSendLocks, partnerChannel, sendTapWritable } from "../core/routing";
 import { INSERT_FX_NONE, type InsertFxOption } from "../core/control/params";
 import { PAN_MAX, PAN_MIN, PHONES_LEVEL_DEFAULT, PHONES_LEVEL_MAX, PHONES_LEVEL_MIN } from "../core/control/vd";
 import { setLevelText } from "./glyph";
@@ -131,6 +131,9 @@ interface KnobSpec {
   /** Indicator angle (deg) for a value; default is a -135°..+135° sweep over the
    *  range. Override to place specific values (e.g. PHONES 2/8) at the horizontal. */
   angle?: (v: number) => number;
+  /** When set, the knob shows its value but cannot be edited (a device-locked
+   *  control, e.g. a Pan-Link send pan). The string is the disabled tooltip. */
+  readonlyTitle?: string;
 }
 
 export interface ConsoleHooks {
@@ -722,6 +725,11 @@ export class Console {
     const level = usesSend ? this.getSend(m.id, this.mode as SendTarget) : this.getMain(m);
     const np = plan.nodeParams[m.id] ?? {};
 
+    // In a MIX send tab, mirror the destination bus's hidden-mode locks: FIXED BUS
+    // Type locks the send fader and Pan Link locks the send pan knob read-only (the
+    // graph inspector drops those controls instead — same rule, different view).
+    const { busFixed, panLinked } = usesSend ? mixSendLocks(plan, this.mode) : { busFixed: false, panLinked: false };
+
     // For an input/FX channel the MUTE chip always controls a → bus send's ON/OFF,
     // never the channel master: in MAIN it is the → STEREO assign ON (firmware V1.3),
     // in a send tab the → MIX/FX send. When the channel master (CH_ON) is muted the
@@ -901,7 +909,7 @@ export class Console {
     if (m.isChannel || this.isFxChannel(m.id)) {
       const target = usesSend ? (this.mode as SendTarget) : MAIN_BUS;
       if (target !== "bus.fx1" && target !== "bus.fx2") {
-        this.addSendPanKnob(head, m.id, target, m.isBalance ? "BAL" : "PAN");
+        this.addSendPanKnob(head, m.id, target, m.isBalance ? "BAL" : "PAN", panLinked ? t().inspector.panLinked : undefined);
       }
     }
     if (m.hasPhones) {
@@ -931,10 +939,15 @@ export class Console {
     zone.append(tapHead);
     const zrow = el("div", "con-zrow");
 
-    const fader = el("div", "con-fader");
-    fader.tabIndex = 0;
+    const fader = el("div", "con-fader" + (busFixed ? " readonly" : ""));
     fader.setAttribute("role", "slider");
     fader.setAttribute("aria-label", m.label);
+    if (busFixed) {
+      fader.setAttribute("aria-disabled", "true");
+      fader.title = t().inspector.busFixedLevel;
+    } else {
+      fader.tabIndex = 0;
+    }
     const track = el("div", "track");
     // The 0 dB line rides the fader (not the inset track) so it shares the cap's
     // coordinate space and passes through the cap centre when the fader sits at 0 dB.
@@ -987,7 +1000,8 @@ export class Console {
       sig: { v: 0, pk: 0, over: 0, lv: -1, lpk: -1, lov: -1, lmtr: 1, live: false },
     };
     this.refs.set(m.id, refObj);
-    this.wireFader(refObj, usesSend);
+    // A FIXED-bus send fader is display-only: keep it out of the input wiring.
+    if (!busFixed) this.wireFader(refObj, usesSend);
     return strip;
   }
 
@@ -1225,7 +1239,7 @@ export class Console {
 
   /** Add a PAN/BALANCE knob bound to a send connection's `pan` (L63 – C – R63),
    *  resetting to the factory plan's value on double-click. */
-  private addSendPanKnob(head: HTMLElement, id: string, target: string, label: string): void {
+  private addSendPanKnob(head: HTMLElement, id: string, target: string, label: string, readonlyTitle?: string): void {
     const conn = (): PlanConnection | undefined => this.sendConn(this.hooks.getPlan(), id, target);
     const factory = this.sendConn(this.factoryPlan(), id, target)?.params?.pan ?? 0;
     this.addKnob(head, label, {
@@ -1239,6 +1253,7 @@ export class Console {
       step: 1,
       format: (v) => (v === 0 ? "C" : v < 0 ? "L" + -v : "R" + v),
       reset: factory,
+      readonlyTitle,
     }, id);
   }
 
@@ -1348,13 +1363,20 @@ export class Console {
     lbl.textContent = label;
     const val = el("span", "val");
     info.append(lbl, val);
-    const knob = el("div", "con-knob");
-    knob.tabIndex = 0;
+    const knob = el("div", "con-knob" + (k.readonlyTitle ? " readonly" : ""));
     knob.setAttribute("role", "slider");
     knob.setAttribute("aria-label", label);
     knob.append(el("i", "ind"));
     box.append(info, knob);
     head.append(box);
+    // A device-locked knob shows its value but takes no input; wireKnob paints the
+    // value in both cases and only skips the drag / key handlers when locked.
+    if (k.readonlyTitle) {
+      knob.setAttribute("aria-disabled", "true");
+      knob.title = k.readonlyTitle;
+    } else {
+      knob.tabIndex = 0;
+    }
     this.wireKnob(knob, val, k, id);
   }
 
@@ -1376,6 +1398,7 @@ export class Console {
       this.commit(id);
     };
     show(Math.max(k.min, Math.min(k.max, k.get()))); // initial display, not dirty
+    if (k.readonlyTitle) return; // device-locked: value painted, no input handlers
     knob.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       knob.setPointerCapture(e.pointerId);
