@@ -37,7 +37,7 @@ import {
   type InsertFxParamDesc,
   type MbcBandKey,
 } from "../core/control/insert-fx-effect";
-import { isBalLinkedPair, isFixedConnection, pairPrimary, sendHasOn, sendHasTap, sendTapWritable } from "../core/routing";
+import { isBalLinkedPair, isFixedConnection, mixSendLocks, pairPrimary, sendHasOn, sendHasTap, sendTapWritable } from "../core/routing";
 import type { DynField, EqControl } from "../core/control/translate";
 import {
   busEqOn,
@@ -72,7 +72,6 @@ import {
   OSC_MODE_SINE,
   REC_POINT_DEFAULT,
   REC_POINT_OPTIONS,
-  BUS_TYPE_FIXED,
   BUS_TYPE_VARI,
   BUS_TYPE_OPTIONS,
   SD_REC_TRACK_COUNT_DEFAULT,
@@ -724,11 +723,7 @@ export function renderInspector(
     // A MIX 1 / MIX 2 destination governs the send controls: FIXED bus type drops
     // the LEVEL (fixed send level); Pan Link (VARI only) drops the PAN (it follows
     // the source channel PAN).
-    const destId = parseRef(to).nodeId;
-    const destNp = plan.nodeParams[destId];
-    const isMix = destId === "bus.mix1" || destId === "bus.mix2";
-    const busFixed = isMix && (destNp?.busType ?? BUS_TYPE_VARI) === BUS_TYPE_FIXED;
-    const panLinked = isMix && !busFixed && destNp?.panLink === true;
+    const { busFixed, panLinked } = mixSendLocks(plan, parseRef(to).nodeId);
     // PRE/POST is taken against the channel's STEREO main-fader level, so the
     // fixed STEREO / FX-channel main paths show LEVEL / PAN but no PRE/POST.
     const fields = PARAM_FIELDS[conn.kind].filter(

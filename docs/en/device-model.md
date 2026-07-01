@@ -170,7 +170,8 @@ dotted line** so the live routing stands out, and a toolbar **"Hide off sends"**
 > default and what the tool models) or FIXED (a fixed send level — sends into the bus carry no
 > adjustable LEVEL). **Pan Link** (VARI only) ties each send's PAN to the source channel PAN, so the
 > per-send PAN is no longer independent. Stored on the MIX bus node; the connection panel hides the
-> LEVEL (FIXED) or PAN (Pan Link) accordingly and shows a short note.
+> LEVEL (FIXED) or PAN (Pan Link) accordingly and shows a short note. The console applies the same
+> locks in that MIX send tab, rendering the send fader (FIXED) or pan knob (Pan Link) read-only.
 
 > On the canvas a PRE MIX/FX send is drawn **dashed with an amber "PRE" tap marker just after the
 > source**, so it is visible without selecting the connection. POST (the default) is solid and unmarked.
