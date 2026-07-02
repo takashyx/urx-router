@@ -87,6 +87,9 @@ export const PHONES_LEVEL_MAX = 10;
 export const PHONES_LEVEL_DEFAULT = 2;
 
 function clamp(v: number, lo: number, hi: number): number {
+  // NaN comparisons are all false, so trap it explicitly to the low bound — a NaN
+  // reaching vdSet would serialize to null (a malformed broker write).
+  if (Number.isNaN(v)) return lo;
   return v < lo ? lo : v > hi ? hi : v;
 }
 
@@ -156,7 +159,10 @@ export const SWEET_SPOT_DATA_MAX = 34;
  *  string ("0001" … "0034"). Out-of-range clamps into [1, 34] (the device clamps
  *  "0035"+ to "0001"; we instead keep a valid in-range index). */
 export function sweetSpotDataToStr(index: number): string {
-  const n = Math.min(SWEET_SPOT_DATA_MAX, Math.max(1, Math.round(index)));
+  // Math.round(NaN) survives the min/max clamp as NaN → "0NaN"; coerce it to 0 so
+  // the [1, 34] clamp still yields a valid four-digit preset string.
+  const raw = Number.isNaN(index) ? 0 : Math.round(index);
+  const n = Math.min(SWEET_SPOT_DATA_MAX, Math.max(1, raw));
   return String(n).padStart(4, "0");
 }
 /** Device Sweet Spot Data string ("0001" …) → preset index (1 … 34). A blank or
@@ -372,9 +378,9 @@ export function boolToVd(on: boolean): number {
   return on ? 1 : 0;
 }
 
-/** Broker value → on/off (anything non-zero is on). */
+/** Broker value → on/off (a finite non-zero is on; a non-finite raw reads off). */
 export function vdToBool(value: number): boolean {
-  return value !== 0;
+  return Number.isFinite(value) && value !== 0;
 }
 
 // Routing-source port refs. The streaming-source selector stores the port with a

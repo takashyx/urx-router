@@ -110,14 +110,13 @@ describe("encoder behavior on non-finite / far-out-of-range input", () => {
     expect(Number.isFinite(eqFreqToVd(-Infinity))).toBe(true);
   });
 
-  it("NaN propagates through clamp (documents the gap: clamp does not trap NaN)", () => {
-    // clamp(NaN, lo, hi) returns NaN because every comparison is false; the level
-    // encoder's pre-clamp -∞ guard (db < LEVEL_MIN_DB) is also false for NaN, so a
-    // NaN level survives. The UI never produces NaN, but a malformed plan would —
-    // worth knowing the encoders are not a NaN firewall. Pin the current behavior.
-    expect(Number.isNaN(panToVd(NaN))).toBe(true);
-    expect(Number.isNaN(levelToVd(NaN))).toBe(true);
-    expect(Number.isNaN(gainToVd(NaN))).toBe(true);
+  it("NaN is trapped by clamp to the low bound (encoders are a NaN firewall)", () => {
+    // clamp now maps NaN → its low bound instead of letting it through (every NaN
+    // comparison is false), so a malformed plan value can no longer reach vdSet and
+    // serialize to null. Each encoder lands on a finite floor; pan hits -63 exactly.
+    expect(panToVd(NaN)).toBe(-VD_PAN_MAX);
+    expect(Number.isFinite(levelToVd(NaN))).toBe(true);
+    expect(Number.isFinite(gainToVd(NaN))).toBe(true);
   });
 });
 
