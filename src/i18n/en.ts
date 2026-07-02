@@ -248,6 +248,7 @@ export const en = {
     sdRecTap: "Records this channel at its Rec Point (pre-fader by default). Change the channel's Rec Point to pick the recorded stage.",
     duckerKeyTap: "Ducker key — tapped at the source channel's Rec Point, before its fader and Ducker, so that channel's fader / mute do not change the trigger. Key from a STEREO or MIX bus to trigger post-fader.",
     fixedConnection: "Fixed connection — always enabled, cannot be removed.",
+    duckerPreSend: "This channel's Ducker is on, but this PRE (pre-fader) send taps ahead of it, so the send is not ducked. Switch to POST to include the duck.",
     busType: "BUS Type",
     panLink: "Pan Link",
     busFixedLevel: "Send level is fixed (BUS Type: FIXED).",

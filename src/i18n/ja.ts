@@ -247,6 +247,7 @@ export const ja: Messages = {
     sdRecTap: "このチャンネルを Rec Point でタップして録音します (既定はプリフェーダー)。録音する段はチャンネルの Rec Point で選べます。",
     duckerKeyTap: "ダッカーキー — キー元チャンネルの Rec Point (フェーダー・ダッカーより前段) でタップ。そのチャンネルのフェーダー・ミュートはトリガーに影響しません。post-fader でトリガーするには STEREO / MIX バスをキーにしてください。",
     fixedConnection: "固定接続 — 常時有効で削除できません。",
+    duckerPreSend: "このチャンネルのダッカーは ON ですが、この PRE (プリフェーダー) 送りはその手前でタップするためダッキングされません。ダックを含めるには POST に切り替えてください。",
     busType: "BUS Type",
     panLink: "Pan Link",
     busFixedLevel: "Send レベルは固定 (BUS Type: FIXED)。",

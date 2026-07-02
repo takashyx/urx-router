@@ -106,3 +106,20 @@ test("a bus-sourced ducker key gets no pre-fader note (it is post-fader)", async
   await expect(page.locator("#inspector .hint", { hasText: "Ducker key" })).toHaveCount(0);
   await expect(page.locator("#inspector .hint", { hasText: "Selection only" })).toHaveCount(1);
 });
+
+test("a PRE send from a ducked channel is flagged next to the fixed-connection note", async ({ page }) => {
+  // ch_5_6 → MIX 1 is a fixed send with a Pre/Post tap; its ducker is out.ducker1.
+  await setDuckerOn(page, true);
+  await selectWire(page, "ch_5_6:out", "bus.mix1:in");
+
+  // POST by default → post-fader → post-Ducker → ducked, so no note.
+  const preSendNote = () => page.locator("#inspector .hint", { hasText: "not ducked" });
+  await expect(preSendNote()).toHaveCount(0);
+
+  // Switching to PRE taps ahead of the (post-fader) Ducker → not ducked.
+  await page
+    .locator("#inspector .param", { hasText: "Pre/Post" })
+    .getByRole("button", { name: "PRE", exact: true })
+    .click();
+  await expect(preSendNote()).toHaveCount(1);
+});

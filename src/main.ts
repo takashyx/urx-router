@@ -540,8 +540,9 @@ const inspectorActions = {
     // Refresh the console so a mirrored partner keeps up (a no-op while hidden).
     if (mirrored) consoleView.refresh();
     // OSC assign L/R are toggle buttons (not focus-holding sliders); re-render so
-    // the pressed state updates at once.
-    if (patch.oscL !== undefined || patch.oscR !== undefined) refreshInspector();
+    // the pressed state updates at once. A PRE/POST change likewise re-renders so the
+    // ducked-channel PRE-send note appears/clears with the tap.
+    if (patch.oscL !== undefined || patch.oscR !== undefined || patch.tap !== undefined) refreshInspector();
   },
   onUpdateNodeParams: (id: string, patch: NodeParams) => {
     const prev = plan.nodeParams[id];

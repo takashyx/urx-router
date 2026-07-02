@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rateConstraints, formatRate, SAMPLE_RATES, DEFAULT_SAMPLE_RATE, duckerBypassWarnings, channelEqUnavailable } from "./constraints";
+import { rateConstraints, formatRate, SAMPLE_RATES, DEFAULT_SAMPLE_RATE, duckerBypassWarnings, channelDuckerOn, channelEqUnavailable } from "./constraints";
 import { directOutTarget } from "./routing";
 import { emptyPlan } from "./plan";
 import { getModel } from "../models";
@@ -112,6 +112,18 @@ describe("duckerBypassWarnings", () => {
     plan.nodeParams["out.ducker1"] = { duckerOn: true };
     plan.connections.push({ from: ref("bus.stereo", "out"), to: ref("out.usbmain_b", "in"), kind: "patch" });
     expect(duckerBypassWarnings(u44v, plan)).toEqual([]);
+  });
+});
+
+describe("channelDuckerOn", () => {
+  const u44v = getModel("URX44V");
+
+  it("is true only when the channel's hung ducker is on", () => {
+    const plan = emptyPlan("URX44V");
+    expect(channelDuckerOn(u44v, plan, "ch_5_6")).toBe(false); // factory ducker off
+    plan.nodeParams["out.ducker1"] = { duckerOn: true }; // ducker1 hangs on ch_5_6
+    expect(channelDuckerOn(u44v, plan, "ch_5_6")).toBe(true);
+    expect(channelDuckerOn(u44v, plan, "ch_7_8")).toBe(false); // a different channel's ducker
   });
 });
 

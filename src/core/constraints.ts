@@ -56,6 +56,15 @@ export function rateConstraints(model: DeviceModel, sampleRate: number): RateCon
   return { warnings, disabledNodes };
 }
 
+// True when `channelId` is a stereo channel whose Ducker is on. The Ducker sits
+// post-fader on the main path, so a PRE (pre-fader) send taps ahead of it and is
+// not ducked — the inspector notes this on such a send.
+export function channelDuckerOn(model: DeviceModel, plan: Plan, channelId: string): boolean {
+  return model.nodes.some(
+    (n) => n.kind === "ducker" && n.attachTo === channelId && plan.nodeParams[n.id]?.duckerOn === true,
+  );
+}
+
 // Channels whose Ducker is ON while the channel is also tapped straight to a USB
 // direct out (USB MAIN / SUB). That tap is the channel Rec Point, which the block
 // diagram places ahead of the fader and Ducker, so the ducked signal never reaches

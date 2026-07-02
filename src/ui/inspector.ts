@@ -134,7 +134,7 @@ import {
   PHONES_LEVEL_MAX,
   PHONES_LEVEL_DEFAULT,
 } from "../core/control/vd";
-import { channelEqUnavailable, duckerBypassWarnings, rateConstraints } from "../core/constraints";
+import { channelDuckerOn, channelEqUnavailable, duckerBypassWarnings, rateConstraints } from "../core/constraints";
 import { loadJson, saveJson } from "../core/storage";
 import type { RecentEntry } from "../core/storage";
 import type { Selection } from "./graph";
@@ -803,6 +803,15 @@ export function renderInspector(
   // button, only a note that it is structural. Its level/pan above stay editable.
   if (isFixedConnection(model, from, to)) {
     host.append(hint(m.inspector.fixedConnection));
+    // A PRE (pre-fader) send from a channel whose Ducker is on taps ahead of the
+    // Ducker (which sits post-fader), so the send is not ducked — flag it next to
+    // the fixed-connection note rather than on the canvas.
+    if (
+      sendHasTap(model, from, to) &&
+      conn?.params?.tap === "pre" &&
+      channelDuckerOn(model, plan, parseRef(from).nodeId)
+    )
+      host.append(hint(m.inspector.duckerPreSend));
     return;
   }
 

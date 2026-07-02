@@ -291,6 +291,7 @@ Source selection for the analog outputs (MAIN / LINE).
 - Each ducker lives on one stereo channel, so Ducker 1–4 map in order to the model's stereo pairs: URX22 = CH 3/4, 5/6, 7/8, 9/10; URX44 / URX44V = CH 5/6, 7/8, 9/10, 11/12. The on-canvas node is labeled simply `Ducker` with the host pair in its sublabel (`CH 5/6 · Source`); the 1–4 ordinal is the block-diagram enumeration only — the hung position already names the channel, so it is not repeated on the node.
 - Because a ducker belongs to its host channel rather than being a standalone output, it is drawn as a dedicated `ducker`-kind node hung directly below the matching stereo channel (placement, movement and hide behavior in [architecture.md](architecture.md)).
 - When a ducker's on/off (`duckerOn`, factory OFF) is off, the node dims and gets an `OFF` tag like a muted channel (it marks bypass, so the tag is `OFF` rather than `MUTE`).
+- The Ducker sits **post-fader** on the channel's main path, so the STEREO main path and POST sends are ducked but a **PRE (pre-fader) send taps ahead of it and is not ducked**. When a ducked channel has a PRE send, the inspector flags that send next to its fixed-connection note (no canvas indicator, to avoid clutter).
 
 ## Fixed (non-wireable) elements
 
