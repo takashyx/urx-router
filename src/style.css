@@ -2397,6 +2397,11 @@ select:focus-visible,
   font-size: 12px;
   color: var(--ctl-text);
 }
+/* The flex above outranks the `hidden` attribute's UA style (the .menu-panel
+   gotcha), so re-assert it — the ✕ button hides the panel via [hidden]. */
+.midi-panel[hidden] {
+  display: none;
+}
 .midi-panel .mp-head {
   display: flex;
   align-items: center;

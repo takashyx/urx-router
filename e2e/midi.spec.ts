@@ -103,6 +103,20 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator("#console-host")).toBeVisible();
 });
 
+test("the ✕ button closes the panel and drops learn mode", async ({ page }) => {
+  await openPanel(page);
+  await page.locator("#midi-panel .mp-learn-btn").click(); // learn on
+  await expect(page.locator("#console-host")).toHaveClass(/midi-learn/);
+  // The panel class sets its own display, so [hidden] must still win (the
+  // .menu-panel gotcha): after ✕ the panel is gone, not just marked hidden.
+  await page.locator("#midi-panel .mp-close").click();
+  await expect(page.locator("#midi-panel")).toBeHidden();
+  await expect(page.locator("#console-host")).not.toHaveClass(/midi-learn/);
+  // Reopening works too.
+  await openPanel(page);
+  await expect(page.locator("#midi-panel")).toBeVisible();
+});
+
 test("learn binds a CC to a fader and incoming CC moves it", async ({ page }) => {
   await openPanel(page);
   await pickInputPort(page);
