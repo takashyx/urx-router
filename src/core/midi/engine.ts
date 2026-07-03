@@ -142,30 +142,28 @@ export class MidiEngine {
       this.feedLearn(ev);
       return;
     }
-    for (const { mapping, key } of this.matches(ev)) this.apply(mapping, key, ev);
+    for (const mapping of this.matches(ev)) this.apply(mapping, ev);
   }
 
   // The mappings an event addresses. A CC can hit a plain CC binding and either
-  // half of a 14-bit pair binding; note / pitch bend hit exactly one key.
-  private matches(ev: MidiEvent): Array<{ mapping: MidiMapping; key: string }> {
-    const keys: string[] = [];
+  // half of a 14-bit pair binding; note / pitch bend hit exactly one address.
+  private matches(ev: MidiEvent): MidiMapping[] {
+    const addrs: MidiAddr[] = [];
     if (ev.type === "cc") {
-      keys.push(`cc:${ev.channel}:${ev.controller}`);
-      if (ev.controller < 32) keys.push(`cc14:${ev.channel}:${ev.controller}`);
-      else keys.push(`cc14:${ev.channel}:${ev.controller - 32}`);
+      addrs.push({ type: "cc", channel: ev.channel, controller: ev.controller });
+      addrs.push({ type: "cc14", channel: ev.channel, controller: ev.controller < 32 ? ev.controller : ev.controller - 32 });
     } else if (ev.type === "note") {
-      keys.push(`note:${ev.channel}:${ev.note}`);
+      addrs.push({ type: "note", channel: ev.channel, note: ev.note });
     } else {
-      keys.push(`pb:${ev.channel}`);
+      addrs.push({ type: "pitchbend", channel: ev.channel });
     }
-    const found: Array<{ mapping: MidiMapping; key: string }> = [];
-    for (const key of keys) for (const mapping of this.byKey.get(key) ?? []) found.push({ mapping, key });
-    return found;
+    return addrs.flatMap((addr) => this.byKey.get(addrKey(addr)) ?? []);
   }
 
-  private apply(mapping: MidiMapping, key: string, ev: MidiEvent): void {
+  private apply(mapping: MidiMapping, ev: MidiEvent): void {
     const control = this.hooks.resolve(mapping.control);
     if (!control) return; // stale mapping (other model) — leave it inert
+    const key = addrKey(mapping.addr); // a mapping only ever matches via its own address
     const toggle = control.kind === "toggle";
     // Receive bookkeeping suppresses the echo for continuous controls only: a
     // toggle press does not represent the new state (a momentary button cannot
@@ -175,10 +173,11 @@ export class MidiEngine {
     const target = toggle ? this.toggleTarget(mapping, key, ev, before) : this.continuousTarget(mapping, key, ev, before, control.step);
     if (target === null) return;
     if (!control.set(target)) return; // device-locked — swallowed
+    const after = control.get();
     // The controller already shows what it sent: remember the applied value as
     // fed back, so the settle pass only sends a genuinely different value.
-    if (!toggle && mapping.mode !== "relative") this.lastSent.set(key, this.encodeRaw(mapping.addr, control.get()));
-    if (control.get() !== before) this.hooks.applied(control);
+    if (!toggle && mapping.mode !== "relative") this.lastSent.set(key, this.encodeRaw(mapping.addr, after));
+    if (after !== before) this.hooks.applied(control);
   }
 
   // Toggles: "edge" (default) flips on a note-on or a CC rising edge (≥ 64) —
@@ -189,7 +188,6 @@ export class MidiEngine {
   private toggleTarget(mapping: MidiMapping, key: string, ev: MidiEvent, current: number): number | null {
     if (ev.type === "pitchbend") return null;
     if (mapping.button === "state") {
-      if (ev.type === "cc") this.lastCc.set(key, ev.value);
       const target = ev.type === "note" ? (ev.on ? 1 : 0) : ev.value >= 64 ? 1 : 0;
       return target === current ? null : target;
     }

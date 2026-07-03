@@ -6,8 +6,7 @@
 // labels are composed by the UI from the node label + the param token.
 
 import type { DeviceModel } from "../../models/types";
-import { ref } from "../../models/types";
-import { LEVEL_OFF_DB, type NodeParams, type Plan, type PlanConnection } from "../plan";
+import { LEVEL_OFF_DB, sendConnection, type NodeParams, type Plan, type PlanConnection } from "../plan";
 import { LEVEL_POS_MAX, levelToPos, posToLevel } from "../levels";
 import { busBalance, channelControl } from "../control/translate";
 import { mixSendLocks } from "../routing";
@@ -15,10 +14,11 @@ import { channelEqUnavailable } from "../constraints";
 import { PAN_MAX, PAN_MIN, PHONES_LEVEL_DEFAULT, PHONES_LEVEL_MAX, PHONES_LEVEL_MIN } from "../control/vd";
 
 /** The STEREO master — every channel's / FX channel's fixed main send target. */
-const MAIN_BUS = "bus.stereo";
+export const MAIN_BUS = "bus.stereo";
 
 /** Send targets a channel strip can follow (the console's send-on-fader tabs). */
-const SEND_TARGETS = ["bus.fx1", "bus.fx2", "bus.mix1", "bus.mix2"] as const;
+export const SEND_TARGETS = ["bus.fx1", "bus.fx2", "bus.mix1", "bus.mix2"] as const;
+export type SendTarget = (typeof SEND_TARGETS)[number];
 
 /** Param tokens; the UI localizes them (i18n midi.param). */
 export type ControlParam =
@@ -72,7 +72,7 @@ export function controlId(node: string, param: ControlParam, send?: string): str
 
 export function parseControlId(id: string): { node: string; param: string; send?: string } | null {
   const m = /^([^/@]+)\/([^/@]+)(?:@([^/@]+))?$/.exec(id);
-  return m ? { node: m[1], param: m[2] as ControlParam, ...(m[3] ? { send: m[3] } : {}) } : null;
+  return m ? { node: m[1], param: m[2], ...(m[3] ? { send: m[3] } : {}) } : null;
 }
 
 function clamp01(v: number): number {
@@ -90,17 +90,15 @@ function linearCodec(min: number, max: number, step: number): { get(x: number): 
   const span = max - min;
   return {
     get: (x) => clamp01((x - min) / span),
-    set: (v) => min + Math.round((clamp01(v) * span) / step) * step,
+    // toFixed strips the float dust fractional steps accumulate (0.1-step
+    // arithmetic yields 2.9000000000000004) — the same snap wireKnob applies.
+    set: (v) => Number((min + Math.round((clamp01(v) * span) / step) * step).toFixed(4)),
     step: step / span,
   };
 }
 
 const panCodec = linearCodec(PAN_MIN, PAN_MAX, 1);
-const phonesCodec = {
-  ...linearCodec(PHONES_LEVEL_MIN, PHONES_LEVEL_MAX, 0.1),
-  // Re-round: 0.1-step arithmetic accumulates float error (2.9000000000000004).
-  set: (v: number): number => Math.round(clamp01(v) * 100) / 10,
-};
+const phonesCodec = linearCodec(PHONES_LEVEL_MIN, PHONES_LEVEL_MAX, 0.1);
 const oscLevelCodec = linearCodec(-96, 0, 1);
 
 export function listControls(model: DeviceModel, plan: Plan): ControlDesc[] {
@@ -131,51 +129,56 @@ function nodeControls(model: DeviceModel, plan: Plan, id: string): BoundControl[
   if (!node) return [];
   const out: BoundControl[] = [];
   const np = (): NodeParams => (plan.nodeParams[id] ??= {});
-  const conn = (toId: string): PlanConnection | undefined =>
-    plan.connections.find((c) => c.from === ref(id, "out") && c.to === ref(toId, "in"));
+  const conn = (toId: string): PlanConnection | undefined => sendConnection(plan, id, toId);
 
-  // A continuous control persisted on a send connection's params (level / pan).
+  // A continuous control persisted on a send connection's params (level / pan);
+  // no `send` = the fixed main path into STEREO.
   const connControl = (
     param: "level" | "pan",
-    toId: string,
     send: string | undefined,
     codec: { get(x: number): number; set(v: number): number; step: number },
     fallback: number,
-    locked: () => boolean,
-  ): BoundControl => ({
-    id: controlId(id, param, send),
-    node: id,
-    param,
-    ...(send ? { send } : {}),
-    kind: "continuous",
-    step: codec.step,
-    get: () => codec.get(conn(toId)?.params?.[param] ?? fallback),
-    set: (v) => {
-      const c = conn(toId);
-      if (!c || locked()) return false;
-      c.params = { ...c.params, [param]: codec.set(v) };
-      return true;
-    },
-  });
+    locked?: () => boolean,
+  ): BoundControl => {
+    const to = send ?? MAIN_BUS;
+    return {
+      id: controlId(id, param, send),
+      node: id,
+      param,
+      ...(send ? { send } : {}),
+      kind: "continuous",
+      step: codec.step,
+      get: () => codec.get(conn(to)?.params?.[param] ?? fallback),
+      set: (v) => {
+        const c = conn(to);
+        if (!c || locked?.()) return false;
+        c.params = { ...c.params, [param]: codec.set(v) };
+        return true;
+      },
+    };
+  };
 
   // The MUTE semantics mirror the console chip: on a connection it drives the
   // send's ON (1 = muted = on false); channels'/FX sends ship ON, the MIX → STEREO
   // "TO ST" ships off. On a node it drives the master ON (STEREO / MONITOR).
-  const connMute = (toId: string, send: string | undefined, defaultOn: boolean): BoundControl => ({
-    id: controlId(id, "mute", send),
-    node: id,
-    param: "mute",
-    ...(send ? { send } : {}),
-    kind: "toggle",
-    step: 1,
-    get: () => ((conn(toId)?.params?.on ?? defaultOn) ? 0 : 1),
-    set: (v) => {
-      const c = conn(toId);
-      if (!c) return false;
-      c.params = { ...c.params, on: v < 0.5 };
-      return true;
-    },
-  });
+  const connMute = (send: string | undefined, defaultOn: boolean): BoundControl => {
+    const to = send ?? MAIN_BUS;
+    return {
+      id: controlId(id, "mute", send),
+      node: id,
+      param: "mute",
+      ...(send ? { send } : {}),
+      kind: "toggle",
+      step: 1,
+      get: () => ((conn(to)?.params?.on ?? defaultOn) ? 0 : 1),
+      set: (v) => {
+        const c = conn(to);
+        if (!c) return false;
+        c.params = { ...c.params, on: v < 0.5 };
+        return true;
+      },
+    };
+  };
 
   const nodeMute = (): BoundControl => ({
     id: controlId(id, "mute"),
@@ -191,7 +194,7 @@ function nodeControls(model: DeviceModel, plan: Plan, id: string): BoundControl[
   });
 
   type BoolKey = "gateOn" | "compOn" | "eqOn" | "phantom" | "phase" | "phaseL" | "phaseR" | "hpf" | "hiZ" | "cueInterrupt" | "mono" | "duckerOn";
-  const boolControl = (param: ControlParam & BoolKey, def: boolean, locked?: () => boolean): BoundControl => ({
+  const boolControl = (param: BoolKey, def: boolean, locked?: () => boolean): BoundControl => ({
     id: controlId(id, param),
     node: id,
     param,
@@ -232,7 +235,6 @@ function nodeControls(model: DeviceModel, plan: Plan, id: string): BoundControl[
   const isFx = id === "bus.fx1" || id === "bus.fx2";
   const isMix = id === "bus.mix1" || id === "bus.mix2";
   const isMon = id === "bus.mon1" || id === "bus.mon2";
-  const isMono = /^ch\d+$/.test(id);
 
   if (id === "bus.osc") {
     // OSC drives its level via a knob and an ON button; no mute / sends.
@@ -269,25 +271,25 @@ function nodeControls(model: DeviceModel, plan: Plan, id: string): BoundControl[
 
   if (isChannel || isFx) {
     // Main path: the fixed send into STEREO carries the fader / MUTE / PAN-BAL.
-    out.push(connControl("level", MAIN_BUS, undefined, levelCodec, 0, () => false));
-    out.push(connMute(MAIN_BUS, undefined, true));
-    out.push(connControl("pan", MAIN_BUS, undefined, panCodec, 0, () => false));
+    out.push(connControl("level", undefined, levelCodec, 0));
+    out.push(connMute(undefined, true));
+    out.push(connControl("pan", undefined, panCodec, 0));
     // Sends: level + mute per reachable bus; pan on MIX sends only (FX sends are
     // mono on the device). FIXED BUS Type locks the level, Pan Link the pan.
     for (const target of SEND_TARGETS) {
       if (target === id || !conn(target)) continue;
       const locks = (): { busFixed: boolean; panLinked: boolean } => mixSendLocks(plan, target);
-      out.push(connControl("level", target, target, levelCodec, LEVEL_OFF_DB, () => locks().busFixed));
-      out.push(connMute(target, target, true));
+      out.push(connControl("level", target, levelCodec, LEVEL_OFF_DB, () => locks().busFixed));
+      out.push(connMute(target, true));
       if (target === "bus.mix1" || target === "bus.mix2") {
-        out.push(connControl("pan", target, target, panCodec, 0, () => locks().panLinked));
+        out.push(connControl("pan", target, panCodec, 0, () => locks().panLinked));
       }
     }
   } else if (isMix) {
     // MIX strip: own fader; MUTE = the MIX → STEREO "TO ST" send (ships off).
     // The MIX master ON (675) is inspector-only, like the console.
     out.push(nodeControl("level", levelCodec, 0));
-    out.push(connMute(MAIN_BUS, undefined, false));
+    out.push(connMute(undefined, false));
   } else {
     // STEREO master / MONITOR buses: own fader + master ON as MUTE.
     out.push(nodeControl("level", levelCodec, 0));
@@ -299,15 +301,16 @@ function nodeControls(model: DeviceModel, plan: Plan, id: string): BoundControl[
   const cc = channelControl(model, id);
   if (isChannel && cc?.gain) {
     // Fallback = the factory value (A.GAIN -8 on mono mic strips, D.GAIN 0).
-    out.push(nodeControl("gain", linearCodec(cc.gain.minDb, cc.gain.maxDb, 1), isMono ? -8 : 0));
+    out.push(nodeControl("gain", linearCodec(cc.gain.minDb, cc.gain.maxDb, 1), cc.gain.analog ? -8 : 0));
   }
   if (isChannel) {
+    // The mic-strip channels (mono ch1..4) are the only GATE/COMP-bearing strips.
     if (cc?.hasMicStrip) out.push(boolControl("phantom", false));
     for (const ph of cc?.phases ?? []) out.push(boolControl(ph.key, false));
     if (cc?.hasHpf) out.push(boolControl("hpf", false));
     if (cc?.hasHiZ) out.push(boolControl("hiZ", false));
-    if (isMono) out.push(boolControl("gateOn", false));
-    if (isMono) out.push(boolControl("compOn", false));
+    if (cc?.hasMicStrip) out.push(boolControl("gateOn", false));
+    if (cc?.hasMicStrip) out.push(boolControl("compOn", false));
   }
   // EQ ON: channels + MIX + STEREO. Stereo-channel EQ is inert (forced off) at
   // 176.4 / 192 kHz, exactly like the console chip.

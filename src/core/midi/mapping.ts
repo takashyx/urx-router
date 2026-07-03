@@ -11,23 +11,31 @@ export type MidiAddr =
   | { type: "note"; channel: number; note: number }
   | { type: "pitchbend"; channel: number };
 
+// Each vocabulary is one `as const` array: the type, the persistence
+// sanitizer, and the UI's option list all derive from it, so adding a value
+// is a single edit.
+
 /** How a continuous mapping takes values in (toggles ignore this):
  *  absolute = apply as-is (jumps when the physical control is elsewhere);
  *  pickup = ignore until the physical value reaches/crosses the current one;
  *  relative = the CC value is a signed delta (endless encoders). */
-export type TakeMode = "absolute" | "pickup" | "relative";
+export const TAKE_MODES = ["absolute", "pickup", "relative"] as const;
+export type TakeMode = (typeof TAKE_MODES)[number];
 
 /** Relative-CC delta encodings (controller-dependent):
  *  twos = two's complement (1..63 up, 127..65 down);
  *  offset64 = value - 64; signbit = 0..63 up, 64..127 down by (value - 64). */
-export type RelativeEncoding = "twos" | "offset64" | "signbit";
+export const RELATIVE_ENCODINGS = ["twos", "offset64", "signbit"] as const;
+export type RelativeEncoding = (typeof RELATIVE_ENCODINGS)[number];
 
 /** Toggle-button behavior (toggle controls only):
- *  edge (default) = flip on a press (note-on / CC rising edge; a release is
- *  ignored) — the momentary-button convention;
- *  state = the value is the state (note on / CC ≥ 64 = on, else off) — for
- *  senders that alternate one message per press (e.g. Stream Deck toggles). */
-export type ButtonMode = "edge" | "state";
+ *  edge (default, shown as "Toggle") = flip on a press (note-on / CC rising
+ *  edge; a release is ignored);
+ *  state (shown as "Momentary") = the value is the state (note on / CC ≥ 64 =
+ *  on, else off) — for hold buttons and senders that alternate one message per
+ *  press (e.g. Stream Deck toggles). */
+export const BUTTON_MODES = ["edge", "state"] as const;
+export type ButtonMode = (typeof BUTTON_MODES)[number];
 
 export interface MidiMapping {
   /** The bound console control (controls.ts id, e.g. "ch1/level@bus.mix1"). */
@@ -78,6 +86,10 @@ function isData7(v: unknown): boolean {
   return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 127;
 }
 
+function oneOf<T extends string>(list: readonly T[], v: unknown): v is T {
+  return typeof v === "string" && (list as readonly string[]).includes(v);
+}
+
 function isAddr(v: unknown): v is MidiAddr {
   if (typeof v !== "object" || v === null) return false;
   const a = v as Record<string, unknown>;
@@ -103,9 +115,9 @@ export function isMapping(v: unknown): v is MidiMapping {
   const m = v as Record<string, unknown>;
   if (typeof m.control !== "string" || !m.control) return false;
   if (!isAddr(m.addr)) return false;
-  if (m.mode !== "absolute" && m.mode !== "pickup" && m.mode !== "relative") return false;
-  if (m.encoding !== undefined && m.encoding !== "twos" && m.encoding !== "offset64" && m.encoding !== "signbit") return false;
-  if (m.button !== undefined && m.button !== "edge" && m.button !== "state") return false;
+  if (!oneOf(TAKE_MODES, m.mode)) return false;
+  if (m.encoding !== undefined && !oneOf(RELATIVE_ENCODINGS, m.encoding)) return false;
+  if (m.button !== undefined && !oneOf(BUTTON_MODES, m.button)) return false;
   return true;
 }
 
