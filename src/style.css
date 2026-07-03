@@ -2347,10 +2347,12 @@ select:focus-visible,
 .con-root.midi-learn .con-chip:not(.readonly):not(.spacer) {
   cursor: copy;
 }
+/* No border-radius here: the outline follows each element's own radius (chips /
+   fader caps keep theirs, knobs stay circular) — declaring one would override
+   the knob's 50% and square it while learn mode is on. */
 .midi-target {
   outline: 1px dashed color-mix(in srgb, var(--led) 55%, transparent);
   outline-offset: 1px;
-  border-radius: 3px;
 }
 .midi-target.midi-armed {
   outline: 2px solid var(--led);
