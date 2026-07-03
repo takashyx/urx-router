@@ -1276,6 +1276,8 @@ if (!DEMO) {
   // MIDI learn) and feed edits back to the controller. Incoming edits repaint
   // through the coalesced follow reflect (a controller sweep arrives at wire
   // rate) and run markChanged via onApplied, so Live sync mirrors them too.
+  // The menu entry is revealed by the --experimental gate below while the
+  // feature awaits hardware verification; the wiring itself is unconditional.
   midi = new MidiControl({
     getModel: () => getModel(modelId),
     getPlan: () => plan,
@@ -1294,10 +1296,12 @@ if (!DEMO) {
   });
   $("btn-midi").addEventListener("click", () => midi?.togglePanel());
 
-  // Self-test: an experimental-only diagnostic that briefly overwrites every
-  // parameter, so it stays behind --experimental even though write/live do not.
+  // Experimental-only menu entries: MIDI control (pending hardware
+  // verification) and the self-test, a diagnostic that briefly overwrites
+  // every parameter — write/live do not need the flag.
   experimentalEnabled().then((enabled) => {
     if (!enabled) return;
+    $("btn-midi").hidden = false;
 
     // Device self-test (experimental): read the device, write a perturbed copy,
     // verify it matches, then restore. It owns its own connection, so it does not
