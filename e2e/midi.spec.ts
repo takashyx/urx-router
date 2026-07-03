@@ -142,6 +142,8 @@ test("learn binds a CC to a fader and incoming CC moves it", async ({ page }) =>
   await expect(row).toBeVisible();
   await expect(row).toContainText("CH 1 · Level");
   await expect(row).toContainText("CH 1 CC 7");
+  // The name cell ellipsizes long labels; the title carries the full wording.
+  await expect(row.locator(".mp-ctl")).toHaveAttribute("title", "CH 1 · Level");
   // Learn stays on for the next binding; the mapped control shows its dot.
   await expect(strip(page, "CH 1").locator(".con-fader")).toHaveClass(/midi-mapped/);
   await page.locator("#midi-panel .mp-learn-btn").click(); // learn off

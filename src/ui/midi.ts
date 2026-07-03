@@ -415,8 +415,10 @@ export class MidiControl {
     for (const mapping of mappings) {
       const row = el("div", "mp-row");
       row.dataset.control = mapping.control;
+      const label = this.labelOf(mapping.control);
       const name = el("div", "mp-ctl");
-      name.textContent = this.labelOf(mapping.control);
+      name.textContent = label;
+      name.title = label; // the cell ellipsizes long names; hover shows the full one
       const addr = el("div", "mp-addr");
       addr.textContent = addrLabel(mapping.addr);
       row.append(name, addr);
