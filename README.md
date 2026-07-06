@@ -15,6 +15,8 @@ screens work only while that software is running.
 URX Router fills this gap: it reads, writes, and live-syncs the entire mixer from your computer,
 with or without a DAW — see [Device control](#device-control).
 
+> Background — why this tool exists and how it came together, written up as a [development note](https://blog.semnil.com/en/post-1374.html).
+
 > 日本語版は [README.ja.md](README.ja.md) を参照してください.
 
 ## Live demo
