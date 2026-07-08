@@ -26,6 +26,13 @@ Runs entirely in your browser — no install required: **<https://urx-router.sem
 
 ![URX Router showing a URX44V routing plan in the dark studio-rack theme](docs/assets/screenshot-en.png)
 
+## Download
+
+The desktop app is free (Windows 11 / Apple silicon macOS). Get the latest installer from the
+[GitHub releases](https://github.com/semnil/urx-router/releases/latest) page, or from
+[BOOTH](https://semnil.booth.pm/items/8590010) / [Gumroad](https://semniluser.gumroad.com/l/urx-router).
+Desktop builds auto-update.
+
 ## Device control
 
 With the Device Center software (included in Yamaha's TOOLS for MGX / URX) running, desktop
