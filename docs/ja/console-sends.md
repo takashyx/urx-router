@@ -17,7 +17,11 @@
 
 ラックは全ストリップに全 send の常設コントロールを与える。これに伴い「Send to」タブ、
 send-on-fader モード、コンソールのモードバー (`Output [MAIN]` / `Send to [...]`) を廃止する。
-ヘッドの MUTE チップは従来どおり → STEREO 主経路を制御し、ラックは主経路に触れない。
+ヘッドの MUTE チップは従来どおり → STEREO 主経路を制御し (その send を持つストリップ = チャンネル・FX
+チャンネル・MIX バスのみ)、ラックは主経路に触れない。ノード master ON/OFF (CH_ON / MIX 675 / STEREO /
+MONITOR、いずれも `np.on`、および OSC の `osc.on`) はスクリブル上の**電源 LED** — スクリブル全体がそのボタンで、
+オフのときストリップが減光する (グラフと共有の `isNodeInactive` 述語)。これにより旧「CH MUTE」赤バッジは廃止。
+STEREO と MONITOR バスは → STEREO send を持たないため MUTE チップを持たず、電源 LED が唯一の ON/OFF。
 
 ## レイアウト
 
@@ -55,8 +59,8 @@ send-on-fader モード、コンソールのモードバー (`Output [MAIN]` / `
 
 ### send 有効チップ
 
-- 固定 send 接続の `params.on` をトグルする。琥珀点灯 = send 有効 (ON 極性。OSCILLATOR の
-  ON ボタンと同じで、MUTE 極性ではない — ラベルは送り先であって "MUTE" ではない)。
+- 固定 send 接続の `params.on` をトグルする。琥珀点灯 = send 有効 (ON 極性。スクリブル電源 LED と
+  同じで、MUTE 極性ではない — ラベルは送り先であって "MUTE" ではない)。
 - チップラベルは送り先の短縮形 `F1` / `F2` / `M1` / `M2`。フル名はヘッダ読み値と
   SEND PAN ポップオーバーに現れる。
 

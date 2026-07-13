@@ -1550,12 +1550,9 @@ select:focus-visible,
   border-right: 1px solid var(--line);
   background: var(--panel);
 }
-.con-strip.master {
-  width: 116px;
-}
-/* FX channel whose master ON is muted, shown in a MIX send mode: dim the whole
-   strip (like a muted graph node) while its send controls stay operable. */
-.con-strip.master-muted {
+/* A node whose master is off (power LED off): dim the whole strip like the graph
+   dims a muted node, while its other controls (MUTE / sends / EQ) stay operable. */
+.con-strip.inactive {
   opacity: 0.5;
 }
 
@@ -1585,8 +1582,14 @@ select:focus-visible,
   color: #fff;
 }
 .con-scribble .name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font: 700 11px var(--mono);
   line-height: 1.1;
+}
+.con-scribble .name .txt {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1598,22 +1601,49 @@ select:focus-visible,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Breathing room below the name row (with the power LED) so the device-name row
+     doesn't crowd it. */
+  margin-top: 3px;
 }
 .con-scribble .id.empty {
   opacity: 0.6;
 }
-/* Master-mute badge: a small red pill in the scribble's top-right corner, marking
-   that the FX channel itself is muted (distinct from the per-send MUTE chip). */
-.con-scribble .ch-mute {
-  position: absolute;
-  top: 3px;
-  right: 4px;
-  font: 700 7.5px var(--mono);
-  letter-spacing: 0.5px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--mute-on);
-  color: #fff;
+/* Power LED = the node master ON. A recessed dark well so the dot reads against a
+   fixed dark socket, not the arbitrary CH SETTING background (a lit amber LED on an
+   amber scribble is ~1:1); lit = on, dark = off. */
+.con-scribble .con-pled {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  background: #14110d;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(0, 0, 0, 0.65);
+}
+.con-scribble .con-pled .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4b463b;
+}
+.con-scribble .con-pled.on .dot {
+  background: var(--led);
+  box-shadow: 0 0 4px 1px color-mix(in srgb, var(--led) 78%, transparent);
+}
+/* The scribble is a button when it carries a power LED: pointer, no text-selection
+   (so a stray drag while reading a name doesn't toggle the master). */
+.con-scribble.power {
+  cursor: pointer;
+  user-select: none;
+}
+/* The shared amber focus ring vanishes on amber / orange scribbles; give the power
+   scribble a white outline with a dark halo so focus reads on any CH SETTING colour. */
+.con-scribble.power:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  box-shadow: var(--ctl-shadow), 0 0 0 4px rgba(0, 0, 0, 0.9);
 }
 .con-chips {
   display: flex;

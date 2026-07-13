@@ -240,12 +240,13 @@ Strips whose fader/meter top out at 0 dB (the meter-only STREAMING and OSCILLATO
 unreachable +5/+10 ticks. Each tick centres its digits with the minus sign hanging left, so `10` and
 `-10` line up vertically. Above the zone the scribble shows two lines — **node name + device CH SETTING
 name** (the monitor buses carry no CH SETTING name, so their second line names the linked PHONES output instead —
-`Phone 1` / `Phone 2`). Below it sit two 2-column chip groups: (1) channel / input (HA) — MUTE (on channels, FX channels, the
-master, the MIX buses and the MONITOR buses; an **input / FX channel's drives the → STEREO assign ON**
-(firmware V1.3, the post-fader SEND TO STEREO switch) — not the channel master (CH_ON /
-FX-channel ON), which is set from the inspector only; the per-send ON/OFF lives in the SENDS rack; the master's is the
-STEREO master ON, a **MIX bus's drives the MIX → STEREO TO ST switch** (`params.on`, muted = TO ST off), and a
-**MONITOR bus's is the device MONITOR ON** (`np.on` → `MONITOR_ON`, the MONITOR-screen [ON] button)). A MONITOR
+`Phone 1` / `Phone 2`). Left of the name sits a **power LED** — the whole scribble is a button toggling the
+node master ON/OFF (see the inactive-dim note below). Below it sit two 2-column chip groups: (1) channel / input (HA) — **MUTE**, only on the strips that
+send to STEREO (channels, FX channels, MIX buses): it drives that fixed → STEREO send's ON/OFF — an **input /
+FX channel's → STEREO assign ON** (firmware V1.3, the post-fader SEND TO STEREO switch) or a **MIX bus's
+MIX → STEREO TO ST switch** (`params.on`, muted = TO ST off) — never the node master (CH_ON / FX-channel ON /
+MIX 675), which is the scribble power LED. STEREO and the MONITOR buses have no → STEREO send, so they carry
+no MUTE chip; their master ON is the power LED alone. A MONITOR
 bus also carries **CUE Int** (`cueInterrupt` → `MONITOR_CUE_INTERRUPT`, ships ON) and **MONO** (`mono` →
 `MONITOR_MONO`, ships OFF) chips. Then +48 / φ /
 HPF on mono MIC channels (Hi-Z on CH3/4) or φL / φR on stereo channels (gated by `channelControl`); (2) the processing
@@ -271,7 +272,8 @@ a knob resets it to the **factory value** (from `defaultPlan`).
   PRE INS FX → POST; FX channels PRE FADER → POST; monitors and the oscillator are single-meter and have
   no selector. STREAMING and the OSCILLATOR have device meters but no level fader, so they are **meter-only
   strips** (`buildMeterOnlyStrip`: a live meter with no fader, no set-level readout, and no tap selector). The
-  **OSCILLATOR** additionally carries an **ON button** (normally OFF, lit = generating, `osc.on`) and a **LEVEL
+  **OSCILLATOR**'s on/off is the scribble power LED (`osc.on`, normally OFF, so its strip rests dimmed until
+  switched on); it carries a **LEVEL
   rotary knob** (−96…0 dB, the shared device level; its indicator's horizontal marks read -50 left / -8 right)
   in place of a fader; **STREAMING** carries a **DELAY on/off chip** (`delay.on`) and a **TIME knob** (the delay
   time, 1…1000 ms; the inspector keeps the finer 0.01 ms grid) so the otherwise-bare head reads as a purposeful
@@ -299,10 +301,11 @@ a knob resets it to the **factory value** (from `defaultPlan`).
   **SEND PAN popover** below it — the MIX sends' pan as rotary knobs (FX sends are mono; Pan Link locks a knob
   read-only). Clicking any `SENDS` header collapses/expands every rack together (a `sends-collapsed` host
   class, persisted in `localStorage` `urx-sends-open`), showing one amber dot per active send when collapsed.
-  When a **channel's / FX channel's own master is muted** (channel ON = off), the strip dims and shows a red
-  "CH MUTE" badge on its scribble (the muted-graph-node visual language), since the whole channel — every
-  send — is then silenced; the head MUTE and the rack sends stay operable (the send ON/OFF and the channel ON
-  are independent device params).
+  When any node's **master is off** (the power LED off — CH_ON / MIX 675 / STEREO 582 / MONITOR 723, all on
+  `np.on`, or the oscillator's `osc.on`), the strip **dims** — the shared `isNodeInactive` predicate the graph
+  view uses, so both views dim the same nodes — with the unlit power LED, not a badge, marking why. The head
+  MUTE and the rack sends stay operable (the → STEREO send ON/OFF and the node master are independent device
+  params).
 - **Scribble colour** — the scribble uses each node's **CH SETTING colour** (`plan.nodeColors`, a device
   parameter) rather than the node-kind rail. The text colour is whichever of black/white has the higher
   actual contrast ratio (WCAG relative luminance, `inkOn`), paired with a faint opposite-tone halo
@@ -386,7 +389,8 @@ from an external MIDI controller (desktop app only). Configuration lives in the 
   re-enumerated every time the panel opens.
 - **Mapping (core/midi/)** — pure, language-agnostic logic. `message.ts` decodes/encodes CC / note / pitch
   bend; `mapping.ts` holds the free-mapping model (address, take-in mode) plus persistence validation (a
-  persisted mapping in the removed "relative" take-in mode migrates to absolute on load); `controls.ts`
+  persisted mapping in the removed "relative" take-in mode migrates to absolute on load, and the STEREO /
+  MONITOR power LED's old send-less "mute" id migrates to the uniform "chOn"); `controls.ts`
   enumerates and resolves every console control under a **fixed control id**
   (`node/param[@sendTarget]`, e.g. `ch1/level@bus.mix1`). Fixed ids do not depend on the visible view or the
   SENDS rack's collapse state: "CH 1 main fader" and "CH 1 → MIX 1 send" are separate controls, assigned

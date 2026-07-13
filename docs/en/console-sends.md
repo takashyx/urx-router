@@ -17,7 +17,12 @@ The tabbed design had two structural problems:
 
 The rack gives every strip always-available controls for all of its sends, so the "Send to" tabs,
 the send-on-fader mode, and the console mode bar (`Output [MAIN]` / `Send to [...]`) are removed.
-The head MUTE chip keeps controlling the → STEREO main path; the rack never touches the main path.
+The head MUTE chip keeps controlling the → STEREO main path (on the strips that have that send: channels,
+FX channels, MIX buses); the rack never touches the main path. The node master ON/OFF (CH_ON / MIX 675 /
+STEREO / MONITOR, all `np.on`, and the oscillator's `osc.on`) is a **power LED** on the scribble — the whole
+scribble is its button; when off the strip dims (the shared `isNodeInactive` predicate, matching the graph),
+so the old red "CH MUTE" badge is gone. STEREO and the MONITOR buses have no → STEREO send, so they carry no
+MUTE chip; the power LED is their only on/off.
 
 ## Layout
 
@@ -55,7 +60,7 @@ Expanded height ≈ 156 px, collapsed ≈ 24 px (header only). Orientation, groo
 ### Send enable chip
 
 - Toggles the fixed send connection's `params.on`. Lit amber = send active (ON polarity, like the
-  OSCILLATOR ON button — deliberately *not* MUTE polarity; the label is the destination, not
+  scribble power LED — deliberately *not* MUTE polarity; the label is the destination, not
   "MUTE").
 - Chip labels are the destination short forms `F1` / `F2` / `M1` / `M2`; the full name appears in
   the header readout and the SEND PAN popover.

@@ -6,7 +6,7 @@ import type { DeviceModel, DeviceNode, NodeKind, PortDirection } from "../models
 import { fullLabel, hangsUnderHeader, isSingleInput, parseRef, ref } from "../models/types";
 import type { Plan, PlanConnection } from "../core/plan";
 import { hasConnection, LEVEL_MIN_DB, removeConnection } from "../core/plan";
-import { canConnect, isFixedConnection, legalSources, legalTargets, pairPrimary, partnerChannel, possibleSources, possibleTargets, ruleKind, sendHasTap, upstreamNodes } from "../core/routing";
+import { canConnect, isFixedConnection, isNodeInactive, legalSources, legalTargets, pairPrimary, partnerChannel, possibleSources, possibleTargets, ruleKind, sendHasTap, upstreamNodes } from "../core/routing";
 import { baseName, exportSvgToPdf, exportSvgToPng } from "../core/storage";
 import type { SaveResult } from "../core/storage";
 import { oscAssign } from "../core/control/translate";
@@ -770,15 +770,10 @@ export class Graph {
     return (conn.params?.level ?? 0) <= LEVEL_MIN_DB;
   }
 
-  // Whether a node reads as inactive and should be dimmed: a muted node (CH_ON, a
-  // bus/FX/MONITOR master ON — all on params.on), a bypassed ducker (on/off lives
-  // in duckerOn) or the oscillator when not generating (osc.on) — each off-state
-  // lives on a different param, so each kind needs its own predicate to dim alike.
+  // Whether a node reads as inactive and should be dimmed. Delegates to the shared
+  // core predicate so the CONSOLE view dims the same nodes by construction.
   private isNodeInactive(node: DeviceNode): boolean {
-    const np = this.plan.nodeParams?.[node.id];
-    if (node.kind === "ducker") return np?.duckerOn !== true;
-    if (node.id === "bus.osc") return np?.osc?.on !== true;
-    return np?.on === false;
+    return isNodeInactive(this.plan, node);
   }
 
   // Resting opacity of a node's faceplate, by the same precedence makeNode dims it

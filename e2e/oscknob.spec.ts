@@ -23,6 +23,17 @@ test("the OSCILLATOR strip uses a LEVEL knob, not a fader", async ({ page }) => 
   await expect(osc.locator(".con-gain .val")).toHaveText("-14.0"); // factory level
 });
 
+test("the OSCILLATOR on/off is the power LED (no ON chip); off by default = dimmed", async ({ page }) => {
+  const osc = strip(page, "OSCILLATOR");
+  await expect(osc.getByRole("button", { name: "ON", exact: true })).toHaveCount(0); // no ON chip
+  await expect(osc).toHaveClass(/inactive/); // osc.on ships off → strip rests dimmed
+  const power = osc.locator(".con-scribble.power");
+  await expect(power).toHaveAttribute("aria-pressed", "false");
+  await power.click();
+  await expect(power).toHaveAttribute("aria-pressed", "true");
+  await expect(osc).not.toHaveClass(/inactive/); // switched on → un-dimmed
+});
+
 test("the LEVEL knob adjusts the oscillator level by whole dB", async ({ page }) => {
   const osc = strip(page, "OSCILLATOR");
   const knob = osc.getByRole("slider", { name: "LEVEL" });

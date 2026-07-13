@@ -258,6 +258,19 @@ test("the SENDS rack controls arm with send-scoped control ids", async ({ page }
   await expect(pre).toHaveAttribute("aria-pressed", "true");
 });
 
+test("the scribble power LED arms the node master (chOn) and a note toggles it", async ({ page }) => {
+  await openPanel(page);
+  await pickInputPort(page);
+  const power = () => strip(page, "CH 1").locator(".con-scribble.power");
+  await learnBinding(page, () => power().click(), [0x90, 62, 127]);
+  await expect(page.locator('#midi-panel .mp-row[data-control="ch1/chOn"]')).toBeVisible();
+  await page.locator("#midi-panel .mp-learn-btn").click(); // learn off
+
+  await expect(power()).toHaveAttribute("aria-pressed", "true"); // CH_ON ships on
+  await sendMidi(page, [0x90, 62, 127]);
+  await expect(power()).toHaveAttribute("aria-pressed", "false"); // toggled off
+});
+
 test("edge-mode MUTE flips on every CC press even with no release-to-0 between", async ({ page }) => {
   // Regression for a Stream Deck "Push" button set to send 127 only (no 0 on
   // release, confirmed by a bus trace): edge mode must flip on every press, not

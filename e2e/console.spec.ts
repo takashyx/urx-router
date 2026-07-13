@@ -48,7 +48,7 @@ test("GRAPH / CONSOLE tabs switch the visible view", async ({ page }) => {
 test("the console lays out the input channels and the master", async ({ page }) => {
   await expect(strip(page, "CH 1")).toBeVisible();
   await expect(strip(page, "CH 5/6")).toBeVisible();
-  await expect(strip(page, "STEREO (MAIN)")).toBeVisible();
+  await expect(strip(page, "STEREO")).toBeVisible();
 });
 
 test("the stereo-channel EQ chip locks read-only and off at 192 kHz", async ({ page }) => {
@@ -105,10 +105,10 @@ test("PAN/BAL is a head knob on channels; PHONES on monitor buses", async ({ pag
 });
 
 test("STEREO master and MIX strips carry a master BAL knob", async ({ page }) => {
-  const master = strip(page, "STEREO (MAIN)").locator(".con-knob[aria-label='BAL']");
+  const master = strip(page, "STEREO").locator(".con-knob[aria-label='BAL']");
   await expect(master).toBeVisible();
   await expect(strip(page, "MIX 1").locator(".con-knob[aria-label='BAL']")).toBeVisible();
-  const val = strip(page, "STEREO (MAIN)")
+  const val = strip(page, "STEREO")
     .locator(".con-gain", { has: page.locator(".con-knob[aria-label='BAL']") })
     .locator(".val");
   await expect(val).toHaveText("C");
@@ -160,7 +160,7 @@ test("an FX channel's rack shows only the MIX columns, FX columns empty", async 
 });
 
 test("sendless strips show a dimmed SENDS header with no columns", async ({ page }) => {
-  for (const name of ["MIX 1", "STEREO (MAIN)", "MONITOR 1"]) {
+  for (const name of ["MIX 1", "STEREO", "MONITOR 1"]) {
     const rack = strip(page, name).locator(".con-sends");
     await expect(rack.locator(".con-sh")).toHaveClass(/dim/);
     await expect(rack.locator(".con-scols")).toHaveCount(0);
@@ -259,20 +259,30 @@ test("the head MUTE drives the CH → STEREO assign, not the channel master", as
   await expect(mute).toHaveAttribute("aria-pressed", "false"); // → STEREO assign ships on
   await mute.click();
   await expect(mute).toHaveAttribute("aria-pressed", "true"); // → STEREO assign off
-  // The channel master is untouched: the strip is not master-muted (no CH MUTE badge).
-  await expect(ch).not.toHaveClass(/master-muted/);
-  await expect(ch.locator(".ch-mute")).toHaveCount(0);
+  // The channel master is untouched: the strip is not dimmed, the power LED stays on.
+  await expect(ch).not.toHaveClass(/inactive/);
+  await expect(ch.locator(".con-scribble.power")).toHaveAttribute("aria-pressed", "true");
 });
 
-test("a master-muted channel dims its strip with a CH MUTE badge, keeping sends operable", async ({ page }) => {
-  await muteMasterViaInspector(page, "ch1"); // leaves the view on the console
+test("the scribble power LED toggles the node master and dims the strip", async ({ page }) => {
   const ch = strip(page, "CH 1");
-  await expect(ch).toHaveClass(/master-muted/);
-  await expect(ch.locator(".ch-mute")).toHaveText("CH MUTE");
-  // The rack sends stay operable under the channel-master mute.
+  const power = ch.locator(".con-scribble.power");
+  await expect(power).toHaveAttribute("aria-pressed", "true"); // CH_ON ships on
+  await expect(ch).not.toHaveClass(/inactive/);
+  await power.click();
+  await expect(power).toHaveAttribute("aria-pressed", "false");
+  await expect(ch).toHaveClass(/inactive/);
+  // The head MUTE (→ STEREO send) and the rack sends stay operable under the dim.
   const pre = col(page, "CH 1", "M1").locator(".con-slp");
   await pre.click();
   await expect(pre).toHaveAttribute("aria-pressed", "true");
+});
+
+test("muting the channel master in the inspector dims the console strip", async ({ page }) => {
+  await muteMasterViaInspector(page, "ch1"); // leaves the view on the console
+  const ch = strip(page, "CH 1");
+  await expect(ch).toHaveClass(/inactive/);
+  await expect(ch.locator(".con-scribble.power")).toHaveAttribute("aria-pressed", "false");
 });
 
 test("a MIX strip's head MUTE drives the MIX → STEREO TO ST switch", async ({ page }) => {
@@ -284,11 +294,15 @@ test("a MIX strip's head MUTE drives the MIX → STEREO TO ST switch", async ({ 
   await expect(mute).toHaveAttribute("aria-pressed", "false"); // TO ST on
 });
 
-test("a MONITOR strip has a MUTE (on by default, plan-only)", async ({ page }) => {
-  const mute = strip(page, "MONITOR 1").getByRole("button", { name: "MUTE" });
-  await expect(mute).toHaveAttribute("aria-pressed", "false");
-  await mute.click();
-  await expect(mute).toHaveAttribute("aria-pressed", "true");
+test("a MONITOR strip has no MUTE chip; its on/off is the power LED (MONITOR_ON)", async ({ page }) => {
+  const mon = strip(page, "MONITOR 1");
+  await expect(mon.getByRole("button", { name: "MUTE" })).toHaveCount(0); // no → STEREO send
+  const power = mon.locator(".con-scribble.power");
+  await expect(power).toHaveAttribute("aria-pressed", "true"); // MONITOR_ON ships on
+  await expect(mon).not.toHaveClass(/inactive/);
+  await power.click();
+  await expect(power).toHaveAttribute("aria-pressed", "false");
+  await expect(mon).toHaveClass(/inactive/);
 });
 
 test("a MONITOR strip has C.INT (on by default) and MONO (off) chips", async ({ page }) => {
@@ -304,13 +318,14 @@ test("a MONITOR strip has C.INT (on by default) and MONO (off) chips", async ({ 
   await expect(mono).toHaveAttribute("aria-pressed", "true");
 });
 
-test("the OSCILLATOR strip has an ON button (off by default), not a MUTE", async ({ page }) => {
+test("the OSCILLATOR strip has no MUTE / ON chip; its on/off is the power LED", async ({ page }) => {
   const osc = strip(page, "OSCILLATOR");
-  await expect(osc.getByRole("button", { name: "MUTE" })).toHaveCount(0); // ON, not MUTE
-  const on = osc.getByRole("button", { name: "ON", exact: true });
-  await expect(on).toHaveAttribute("aria-pressed", "false"); // OSC off at the factory
-  await on.click();
-  await expect(on).toHaveAttribute("aria-pressed", "true"); // generating
+  await expect(osc.getByRole("button", { name: "MUTE" })).toHaveCount(0);
+  await expect(osc.getByRole("button", { name: "ON", exact: true })).toHaveCount(0); // no ON chip
+  const power = osc.locator(".con-scribble.power");
+  await expect(power).toHaveAttribute("aria-pressed", "false"); // OSC off at the factory
+  await power.click();
+  await expect(power).toHaveAttribute("aria-pressed", "true"); // generating
 });
 
 test("the STREAMING strip has a DELAY on/off chip and a TIME knob", async ({ page }) => {
