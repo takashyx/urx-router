@@ -113,13 +113,26 @@ export function isMapping(v: unknown): v is MidiMapping {
   return true;
 }
 
+// The STEREO / MONITOR power LED moved off the send-less "mute" (nodeMute, MUTE
+// polarity) onto the uniform "chOn" (nodeOn, ON polarity), so rename those persisted
+// assignments to keep the binding — the physical control still toggles the same
+// master; only the LED-feedback / state-sender polarity flips to match the console.
+const LED_MASTER_NODES = new Set(["bus.stereo", "bus.mon1", "bus.mon2"]);
+function migrateControl(control: unknown): unknown {
+  if (typeof control !== "string") return control;
+  const slash = control.indexOf("/");
+  const node = slash < 0 ? "" : control.slice(0, slash);
+  return control.slice(slash + 1) === "mute" && LED_MASTER_NODES.has(node) ? node + "/chOn" : control;
+}
+
 // Migrate a persisted entry from the removed "relative" take-in mode (endless-
 // encoder deltas): coerce it to absolute so the binding survives — which is
 // also what those controllers were sending all along — and drop the now-unused
-// delta encoding field.
+// delta encoding field. Also rename the STEREO / MONITOR power-LED control (above).
 function coerceLegacy(v: unknown): unknown {
   if (typeof v !== "object" || v === null) return v;
   const { encoding: _drop, ...rest } = v as Record<string, unknown>;
+  rest.control = migrateControl(rest.control);
   return rest.mode === "relative" ? { ...rest, mode: "absolute" } : rest;
 }
 

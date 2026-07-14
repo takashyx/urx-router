@@ -15,7 +15,7 @@ import { defaultTapKey, hasMeter, isStereoTap, METER_FLOOR_DB, METER_GREEN_TOP_D
 import { loadJson, saveJson } from "../core/storage";
 import { channelEqUnavailable } from "../core/constraints";
 import { busBalance, channelControl, insertFxControl } from "../core/control/translate";
-import { isBalLinkedPair, mirrorBalPair, mixSendLocks, partnerChannel, sendTapWritable } from "../core/routing";
+import { isBalLinkedPair, isNodeInactive, mirrorBalPair, mixSendLocks, partnerChannel, sendTapWritable } from "../core/routing";
 import { INSERT_FX_NONE, type InsertFxOption } from "../core/control/params";
 import { DELAY_TIME_MAX_MS, DELAY_TIME_MIN_MS, PAN_MAX, PAN_MIN, PHONES_LEVEL_DEFAULT, PHONES_LEVEL_MAX, PHONES_LEVEL_MIN } from "../core/control/vd";
 // MAIN_BUS (the STEREO master, every channel's fixed main send) and the
@@ -129,11 +129,20 @@ interface StripModel {
   fadersOnly: boolean; // bus/mon/osc/master: always show their own level
   isOsc: boolean;
   isStream: boolean; // the STREAMING bus (meter-only, carries the DELAY chip + TIME knob)
-  hasMute: boolean; // channels + master
+  hasMute: boolean; // strips with a → STEREO send (CH / FX / MIX)
   hasEq: boolean; // channels + mix + stereo
   hasPhones: boolean; // monitor buses (PHONES 1 ↔ mon1, PHONES 2 ↔ mon2)
   meterOnly: boolean; // STREAMING: only a live meter, no fader / set-level readout
+  inactive: boolean; // node master is off (dim the strip; shared isNodeInactive predicate)
   range: LevelRange;
+}
+
+// The scribble power LED's binding: the current on-state, a flip, and the MIDI id it
+// arms. Null for STREAMING (no on/off param).
+interface PowerSpec {
+  on: boolean;
+  toggle: () => void;
+  midiId: string;
 }
 
 // One metered channel within a strip's meter column. A mono strip has a single lane;
@@ -302,7 +311,7 @@ export class Console {
     if (!this.visible) return;
     const old = this.refs.get(id);
     if (!old) return;
-    const fresh = this.buildStrip(this.toStripModel(id), id === MAIN_BUS);
+    const fresh = this.buildStrip(this.toStripModel(id));
     // buildStrip re-registered refs.get(id) with fresh meter elements. Carry the
     // per-lane ballistics (v/pk/over) so the level + peak-hold + clip latch don't reset,
     // but leave the last-written trackers (lv/lpk/lov/lmtr) at their fresh sentinels —
@@ -425,7 +434,9 @@ export class Console {
     const isMono = /^ch\d+$/.test(id); // mono channels are ch1..ch4 (the only gain/gate/comp/φ-bearing strips)
     return {
       id,
-      label: node.label,
+      // The master reads "STEREO" here (the graph keeps the fuller "STEREO (MAIN)"):
+      // the strip is narrow, and the LED + name must fit one line.
+      label: isMaster ? "STEREO" : node.label,
       // Monitors carry no device CH SETTING name; their second row instead names
       // the linked PHONES output (PHONES 1 ↔ mon1, PHONES 2 ↔ mon2).
       deviceName: isMon ? `Phone ${id.slice(-1)}` : this.hooks.getPlan().nodeNames[id] || "",
@@ -438,12 +449,15 @@ export class Console {
       fadersOnly: !(isChannel || this.isFxChannel(id)),
       isOsc,
       isStream,
-      // MIX strips carry a MUTE (the MIX → STEREO "TO ST" switch; the MIX master ON
-      // 675 shows read-only — see masterMuted in buildStrip), and the MONITOR strips
-      // carry a MUTE (np.on → MONITOR_ON, the device [ON] button).
-      hasMute: isChannel || isMaster || this.isFxChannel(id) || isMix || isMon,
+      // The MUTE chip exists only on strips that send to STEREO (CH / FX → STEREO
+      // assign, MIX → STEREO "TO ST"): it toggles that send. STEREO / MONITOR have
+      // no such send, so their master ON is the scribble power LED alone.
+      hasMute: isChannel || this.isFxChannel(id) || isMix,
       hasEq: isChannel || isMix || isMaster,
       hasPhones: id === "bus.mon1" || id === "bus.mon2",
+      // Off-state dim, computed once here (the node is in hand) and read by both strip
+      // builders — the same predicate the graph uses, so the two views dim alike.
+      inactive: isNodeInactive(this.hooks.getPlan(), node),
       meterOnly: isStream || isOsc, // STREAMING + OSC: no fader (OSC uses a level knob)
       // OSC drives its level via the LEVEL knob, so its meter/scale use the shared
       // level_gain ruler like every other strip (and the meter-only STREAMING strip).
@@ -944,19 +958,98 @@ export class Console {
     scrib.style.setProperty("--scrib-shadow", ink.shadow);
   }
 
-  // The scribble strip: the CH SETTING colour + the node name and the device CH
-  // SETTING name row ("—" when unset, so every strip is the same height). Shared by
-  // both strip builders; the master-only CH MUTE badge is appended by the caller.
+  // The scribble strip: the CH SETTING colour + a power LED, the node name and the
+  // device CH SETTING name row ("—" when unset, so every strip is the same height).
+  // Shared by both strip builders. When the strip has an on/off (every strip but
+  // STREAMING) the whole scribble is the power button; the LED reflects its state.
   private scribble(m: StripModel): HTMLElement {
     const scrib = el("div", "con-scribble");
     this.paintScribble(scrib, m.id);
     const name = el("div", "name");
-    name.textContent = m.label;
+    const spec = this.powerSpec(m);
+    let led: HTMLElement | undefined;
+    if (spec) {
+      led = el("span", "con-pled");
+      led.append(el("i", "dot"));
+      name.append(led);
+    }
+    const txt = el("span", "txt");
+    txt.textContent = m.label;
+    // The LED steals ~2 chars; shrink long bus names a step (or two for OSCILLATOR)
+    // so they fit beside it. Channels top out at "CH 11/12" and keep 11px; STREAMING
+    // has no LED (spec null), so its 9-char name stays full-size.
+    if (spec && m.label.length >= 9) txt.style.fontSize = m.label.length >= 10 ? "8px" : "9px";
+    name.append(txt);
     const dev = el("div", "id");
     dev.textContent = m.deviceName || "—";
     if (!m.deviceName) dev.classList.add("empty");
     scrib.append(name, dev);
+    if (spec && led) this.wirePower(scrib, led, m, spec);
     return scrib;
+  }
+
+  // The strip's power control (the scribble LED): the node master ON on np.on — a
+  // CH_ON / FX / MIX 675 (armed as "chOn", since "mute" already carries the CH/FX/MIX
+  // → STEREO send) or a STEREO / MONITOR master (which has no such send, so the LED
+  // reuses the send-less "mute" id) — or the oscillator on osc.on. STREAMING: none.
+  private powerSpec(m: StripModel): PowerSpec | null {
+    if (m.isStream) return null;
+    if (m.isOsc) {
+      return {
+        on: this.hooks.getPlan().nodeParams[m.id]?.osc?.on === true,
+        toggle: () => {
+          const p = this.nodeParamsOf(m.id);
+          p.osc = { ...p.osc, on: !(p.osc?.on === true) };
+        },
+        midiId: controlId(m.id, "oscOn"),
+      };
+    }
+    // Every non-OSC strip's power LED is "chOn" (np.on, ON polarity) — uniform, so
+    // the on-screen LED and the controller LED never disagree on polarity. ("mute" on
+    // CH / FX / MIX is the separate → STEREO send.)
+    return {
+      on: this.hooks.getPlan().nodeParams[m.id]?.on !== false,
+      toggle: () => {
+        const p = this.nodeParamsOf(m.id);
+        p.on = p.on === false;
+      },
+      midiId: controlId(m.id, "chOn"),
+    };
+  }
+
+  // Wire an element as an activatable button: keyboard (Space / Enter), MIDI-learn
+  // mark + arming, and click. `run` performs the edit; in learn mode arming consumes
+  // the activation instead. Shared by the toggle chips and the scribble power button.
+  private wireActivate(el: HTMLElement, midiId: string | undefined, run: () => void): void {
+    el.tabIndex = 0;
+    this.midiMark(el, midiId);
+    const activate = (): void => {
+      if (this.midiArm(midiId)) return;
+      run();
+    };
+    el.addEventListener("click", activate);
+    el.addEventListener("keydown", (e) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        activate();
+      }
+    });
+  }
+
+  // Make the scribble a power button: the LED reflects the on-state, click / Enter /
+  // Space toggle the node master (or oscillator) through the shared funnel. A full
+  // re-render follows so the strip's inactive dim updates.
+  private wirePower(scrib: HTMLElement, led: HTMLElement, m: StripModel, spec: PowerSpec): void {
+    led.classList.toggle("on", spec.on);
+    scrib.classList.add("power");
+    scrib.setAttribute("role", "button");
+    scrib.setAttribute("aria-pressed", String(spec.on));
+    scrib.setAttribute("aria-label", `${m.label} ${t().console.power}`);
+    this.wireActivate(scrib, spec.midiId, () => {
+      spec.toggle();
+      this.commit(m.id);
+      this.render();
+    });
   }
 
   // A toggle chip ("MUTE"/"EQ"/"ON"/…): role=button, aria-pressed, keyboard-activated;
@@ -998,22 +1091,12 @@ export class Console {
       chip.title = readonlyTitle;
       return chip;
     }
-    chip.tabIndex = 0;
-    this.midiMark(chip, midiId);
-    const run = (): void => {
-      if (this.midiArm(midiId)) return;
+    this.wireActivate(chip, midiId, () => {
       const next = toggle();
       chip.classList.toggle("on", next);
       chip.setAttribute("aria-pressed", String(next));
       after?.(next);
       if (this.commit(id)) this.render();
-    };
-    chip.addEventListener("click", run);
-    chip.addEventListener("keydown", (e) => {
-      if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        run();
-      }
     });
     return chip;
   }
@@ -1060,24 +1143,17 @@ export class Console {
   // (the device offers no level/EQ here, just a source select + delay). One meter
   // point (pre/post-DELAY read the same level), so no tap selector either.
   private buildMeterOnlyStrip(m: StripModel): HTMLElement {
-    const strip = el("div", "con-strip meter-only");
+    // OSC rests off by default, so its strip is dimmed until switched on (via the
+    // scribble power LED) — the same inactive dim as every other strip. STREAMING has
+    // no on/off, so it never dims (m.inactive is false there).
+    const strip = el("div", "con-strip meter-only" + (m.inactive ? " inactive" : ""));
     strip.style.setProperty("--rail", m.rail);
 
     const head = el("div", "con-head");
     head.append(this.scribble(m));
-    // OSCILLATOR: an ON button (off by default; highlighted = generating) and a LEVEL
-    // knob that replaces the fader. Both edit the plan and sync live via commit().
+    // OSCILLATOR: a LEVEL knob replaces the fader (the ON/OFF is the scribble power
+    // LED). Edits the plan and syncs live via commit().
     if (m.isOsc) {
-      const chips = el("div", "con-chips");
-      const oscOn = (): boolean => this.hooks.getPlan().nodeParams[m.id]?.osc?.on ?? false;
-      this.makeChip(m.id, chips, t().console.on, false, oscOn(), () => {
-        const np = this.nodeParamsOf(m.id);
-        const next = !oscOn();
-        np.osc = { ...np.osc, on: next };
-        return next;
-      }, { midiId: controlId(m.id, "oscOn") });
-      chips.append(el("div", "con-chip spacer"));
-      head.append(chips);
       // LEVEL knob: full OSC range (-96…0 dB). The indicator's horizontal marks read
       // -50 (left) / -8 (right); the extremes (down-left / down-right) reach -96 / 0.
       const factory = this.factoryPlan().nodeParams[m.id]?.osc?.level ?? -14;
@@ -1172,14 +1248,14 @@ export class Console {
       const group = el("div", "con-group");
       const lbl = el("div", "con-grouplabel");
       lbl.textContent = g.label;
-      group.append(lbl, ...g.ids.map((id) => this.buildStrip(this.toStripModel(id), false)));
+      group.append(lbl, ...g.ids.map((id) => this.buildStrip(this.toStripModel(id))));
       this.stripsHost.append(group);
     }
     if (master) {
       const group = el("div", "con-group master");
       const lbl = el("div", "con-grouplabel");
       lbl.textContent = t().console.master;
-      group.append(lbl, this.buildStrip(this.toStripModel(master), true));
+      group.append(lbl, this.buildStrip(this.toStripModel(master)));
       this.stripsHost.append(group);
     }
     // Lock every head (name / chips / knobs) to the tallest strip, so the head area
@@ -1201,8 +1277,8 @@ export class Console {
     const probe = el("div", "con-strips");
     probe.style.cssText = "position:absolute;visibility:hidden;height:auto;";
     const { groups, master } = this.stripModels();
-    for (const g of groups) for (const id of g.ids) probe.append(this.buildStrip(this.toStripModel(id), false));
-    if (master) probe.append(this.buildStrip(this.toStripModel(master), true));
+    for (const g of groups) for (const id of g.ids) probe.append(this.buildStrip(this.toStripModel(id)));
+    if (master) probe.append(this.buildStrip(this.toStripModel(master)));
     this.host.append(probe);
     // Free every head from the inherited --head-h clamp first, then read them all,
     // so the heights collapse to content in one reflow instead of one write→read
@@ -1217,35 +1293,22 @@ export class Console {
     return max;
   }
 
-  private buildStrip(m: StripModel, isMaster: boolean): HTMLElement {
+  private buildStrip(m: StripModel): HTMLElement {
     if (m.meterOnly) return this.buildMeterOnlyStrip(m);
-    const plan = this.hooks.getPlan();
     const model = this.hooks.getModel();
     const level = this.getMain(m);
-    const np = plan.nodeParams[m.id] ?? {};
 
-    // The MUTE chip controls the fixed main-path connection's ON/OFF: for an input /
-    // FX channel the → STEREO assign ON (firmware V1.3), for a MIX strip the MIX →
-    // STEREO "TO ST" send — never the wire. When the channel / MIX master (CH_ON /
-    // MIX 675, edited in the graph inspector) is muted the whole strip is silenced
-    // regardless, so surface that as a dim + a CH MUTE badge while the chip stays
-    // operable. The per-send ON/OFF now lives in the SENDS rack below.
-    const usesConnMute = m.isChannel || this.isFxChannel(m.id) || this.isMixBus(m.id);
-    const masterMuted = usesConnMute && np.on === false;
-
-    const strip = el("div", "con-strip" + (isMaster ? " master" : "") + (masterMuted ? " master-muted" : ""));
+    // A node whose master is off (CH_ON / MIX 675 / STEREO 582 / MONITOR 723, all on
+    // np.on) is silenced whole — dim the strip like the graph does (shared predicate),
+    // with the scribble power LED, not a badge, marking why. The MUTE chip below is a
+    // separate control: the → STEREO send's ON/OFF, unaffected by the master.
+    const strip = el("div", "con-strip" + (m.inactive ? " inactive" : ""));
     strip.style.setProperty("--rail", m.rail);
 
-    // head: scribble + chips + gain (always the MAIN control set — sends live in the
-    // SENDS rack below, so the head no longer swaps per send target).
+    // head: scribble (with the power LED) + chips + gain (always the MAIN control set —
+    // sends live in the SENDS rack below, so the head no longer swaps per send target).
     const head = el("div", "con-head");
-    const scrib = this.scribble(m);
-    if (masterMuted) {
-      const badge = el("div", "ch-mute");
-      badge.textContent = t().console.chMute;
-      scrib.append(badge);
-    }
-    head.append(scrib);
+    head.append(this.scribble(m));
 
     const cc = channelControl(model, m.id);
 
@@ -1266,28 +1329,18 @@ export class Console {
     // channel + input (HA) group
     const top = el("div", "con-chips");
     if (m.hasMute) {
-      if (usesConnMute) {
-        // The MUTE drives the fixed main-path connection's ON/OFF (never its wire): a
-        // CH/FX → STEREO assign (ships ON), or a MIX → STEREO "TO ST" (ships off).
-        const mix = this.isMixBus(m.id);
-        const conn = (): PlanConnection | undefined => sendConnection(this.hooks.getPlan(), m.id, MAIN_BUS);
-        const sendOn = (): boolean => conn()?.params?.on ?? !mix; // assign ships ON, TO ST off
-        this.makeChip(m.id, top, t().console.mute, true, !sendOn(), () => {
-          const c = conn();
-          const nextOn = !sendOn();
-          if (c) c.params = { ...c.params, on: nextOn };
-          return !nextOn; // chip "on" (highlighted) = muted
-        }, { midiId: controlId(m.id, "mute") });
-      } else {
-        // Master ON/OFF on the node's own `on` flag: the STEREO master
-        // (STEREO_MASTER_ON) writes to the device; a MONITOR bus is plan-only
-        // (no confirmed monitor-ON param), so its mute lives in the plan alone.
-        this.makeChip(m.id, top, t().console.mute, true, np.on === false, () => {
-          const muted = planOf().on === false;
-          this.nodeParamsOf(m.id).on = muted; // toggle: was muted → on, was on → muted
-          return !muted;
-        }, { midiId: controlId(m.id, "mute") });
-      }
+      // The MUTE drives the fixed → STEREO send's ON/OFF (never its wire): a CH / FX →
+      // STEREO assign (ships ON), or a MIX → STEREO "TO ST" (ships off). The node
+      // master lives on the scribble power LED, a separate control.
+      const mix = this.isMixBus(m.id);
+      const conn = (): PlanConnection | undefined => sendConnection(this.hooks.getPlan(), m.id, MAIN_BUS);
+      const sendOn = (): boolean => conn()?.params?.on ?? !mix; // assign ships ON, TO ST off
+      this.makeChip(m.id, top, t().console.mute, true, !sendOn(), () => {
+        const c = conn();
+        const nextOn = !sendOn();
+        if (c) c.params = { ...c.params, on: nextOn };
+        return !nextOn; // chip "on" (highlighted) = muted
+      }, { midiId: controlId(m.id, "mute") });
     }
     // HA input toggles (+48 / polarity / HPF / Hi-Z).
     if (cc?.hasMicStrip) boolChip(top, "+48", "phantom", false);

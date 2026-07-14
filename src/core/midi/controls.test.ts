@@ -61,17 +61,25 @@ describe("control catalog", () => {
       "bus.mix1/pan",
       "bus.mix1/eqOn",
       "bus.stereo/level",
-      "bus.stereo/mute",
       "bus.stereo/pan",
       "bus.mon1/level",
-      "bus.mon1/mute",
       "bus.mon1/phonesLevel",
       "bus.mon1/cueInterrupt",
       "bus.mon1/mono",
       "bus.osc/level",
       "bus.osc/oscOn",
+      // the scribble power LED (node master ON) is a uniform "chOn" on every strip that
+      // has one — including STEREO / MONITOR (which have no MUTE chip)
+      "ch1/chOn",
+      "bus.fx1/chOn",
+      "bus.mix1/chOn",
+      "bus.stereo/chOn",
+      "bus.mon1/chOn",
     ])
       expect(ids, id).toContain(id);
+    // STEREO / MONITOR have no → STEREO send, so no send-less "mute" (their master is chOn)
+    expect(ids).not.toContain("bus.stereo/mute");
+    expect(ids).not.toContain("bus.mon1/mute");
     expect([...ids].some((i) => i.endsWith("/duckerOn"))).toBe(true);
     // STREAMING is meter-only; Hi-Z exists on CH3/CH4 only
     expect([...ids].some((i) => i.startsWith("bus.stream/"))).toBe(false);
@@ -102,7 +110,7 @@ describe("normalized value access", () => {
     expect(mid).toBeLessThan(10);
   });
 
-  it("drives the MUTE semantics of each strip kind", () => {
+  it("drives the MUTE semantics of the send-bearing strips", () => {
     // channel MUTE = the → STEREO assign ON (ships on)
     const chMute = bindControl(model, plan, "ch1/mute")!;
     expect(chMute.get()).toBe(0);
@@ -114,12 +122,20 @@ describe("normalized value access", () => {
     expect(mixMute.get()).toBe(1);
     mixMute.set(0);
     expect(conn("bus.mix1", "bus.stereo").params?.on).toBe(true);
-    // master MUTE = the node's own ON flag
-    const master = bindControl(model, plan, "bus.stereo/mute")!;
-    master.set(1);
-    expect(plan.nodeParams["bus.stereo"]?.on).toBe(false);
-    master.set(0);
-    expect(plan.nodeParams["bus.stereo"]?.on).toBe(true);
+  });
+
+  it("drives the power LED (chOn) on np.on with ON polarity, uniform across strips", () => {
+    // Every strip's power LED is chOn = np.on, lit = 1 = on (opposite polarity to the
+    // mute controls, whose 1 = muted) — including STEREO / MONITOR, which have no MUTE.
+    for (const id of ["ch1", "bus.fx1", "bus.mix1", "bus.stereo", "bus.mon1"]) {
+      const chOn = bindControl(model, plan, `${id}/chOn`)!;
+      expect(chOn.get(), id).toBe(1); // ships on
+      chOn.set(0);
+      expect(plan.nodeParams[id]?.on, id).toBe(false);
+      expect(chOn.get(), id).toBe(0);
+      chOn.set(1);
+      expect(plan.nodeParams[id]?.on, id).toBe(true);
+    }
   });
 
   it("maps gain over the channel's own dB range in 1 dB steps", () => {

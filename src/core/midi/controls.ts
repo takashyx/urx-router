@@ -24,6 +24,7 @@ export type SendTarget = (typeof SEND_TARGETS)[number];
 export type ControlParam =
   | "level"
   | "mute"
+  | "chOn"
   | "pan"
   | "tap"
   | "gain"
@@ -174,14 +175,18 @@ function nodeControls(model: DeviceModel, plan: Plan, id: string): BoundControl[
     };
   };
 
-  const nodeMute = (): BoundControl => ({
-    id: controlId(id, "mute"),
+  // The scribble power LED, on every strip but OSC / STREAMING: the node master ON
+  // (CH_ON / FX / MIX 675 / STEREO 582 / MONITOR 723) on np.on, with ON polarity
+  // (1 = on). Named "chOn" apart from the send-scoped "mute" already bound to the
+  // → STEREO send on CH / FX / MIX.
+  const nodeOn = (): BoundControl => ({
+    id: controlId(id, "chOn"),
     node: id,
-    param: "mute",
+    param: "chOn",
     kind: "toggle",
-    get: () => (plan.nodeParams[id]?.on === false ? 1 : 0),
+    get: () => (plan.nodeParams[id]?.on === false ? 0 : 1),
     set: (v) => {
-      np().on = v < 0.5;
+      np().on = v >= 0.5;
       return true;
     },
   });
@@ -292,14 +297,17 @@ function nodeControls(model: DeviceModel, plan: Plan, id: string): BoundControl[
     }
   } else if (isMix) {
     // MIX strip: own fader; MUTE = the MIX → STEREO "TO ST" send (ships off).
-    // The MIX master ON (675) is inspector-only, like the console.
     out.push(nodeControl("level", levelCodec, 0));
     out.push(connMute(undefined, false));
   } else {
-    // STEREO master / MONITOR buses: own fader + master ON as MUTE.
+    // STEREO master / MONITOR buses: own fader; no → STEREO send, so no MUTE chip.
     out.push(nodeControl("level", levelCodec, 0));
-    out.push(nodeMute());
   }
+
+  // The scribble power LED = the node master ON, uniform across every strip that has
+  // one (all but OSC / STREAMING). On CH / FX / MIX the send-less "mute" is the →
+  // STEREO send, so the LED is a separate "chOn"; STEREO / MONITOR have only this.
+  out.push(nodeOn());
 
   if (busBalance(id)) out.push(nodeControl("pan", panCodec, 0));
 

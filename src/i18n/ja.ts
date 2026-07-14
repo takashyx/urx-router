@@ -57,7 +57,8 @@ export const ja: Messages = {
   },
   console: {
     mute: "MUTE",
-    on: "ON",
+    // スクリブル電源 LED (ノード master on/off) の読み上げ名サフィックス。
+    power: "オン/オフ",
     eq: "EQ",
     pre: "PRE",
     sends: "SENDS",
@@ -66,7 +67,6 @@ export const ja: Messages = {
     cue: "C.INT",
     cueFull: "Cue Interrupt",
     mono: "MONO",
-    chMute: "CH MUTE",
     master: "マスター",
     meterPoint: "METER POINT",
     meterPointHint: "実機がメーターを出すタップ点のみ表示。",
@@ -117,6 +117,7 @@ export const ja: Messages = {
     param: {
       level: "Level",
       mute: "MUTE",
+      chOn: "ON",
       pan: "PAN/BAL",
       tap: "PRE",
       gain: "GAIN",

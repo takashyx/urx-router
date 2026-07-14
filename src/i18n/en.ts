@@ -57,7 +57,9 @@ export const en = {
   },
   console: {
     mute: "MUTE",
-    on: "ON",
+    // Accessible name suffix for the scribble power LED (the node master on/off):
+    // "<strip> on/off". Announced with aria-pressed; not shown on screen.
+    power: "on/off",
     eq: "EQ",
     pre: "PRE",
     // Per-strip SENDS rack: header label, the SEND PAN popover header, and the
@@ -69,7 +71,6 @@ export const en = {
     // Full name of the C.INT chip (kept distinct from the device's plain CUE).
     cueFull: "Cue Interrupt",
     mono: "MONO",
-    chMute: "CH MUTE",
     master: "MASTER",
     meterPoint: "METER POINT",
     meterPointHint: "Only taps the device meters are listed.",
@@ -121,6 +122,7 @@ export const en = {
     param: {
       level: "Level",
       mute: "MUTE",
+      chOn: "ON",
       pan: "PAN/BAL",
       tap: "PRE",
       gain: "GAIN",

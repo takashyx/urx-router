@@ -3,7 +3,7 @@
 // reject a second wire.
 
 import { isSingleInput, parseRef, ref } from "../models/types";
-import type { DeviceModel, RoutingRule } from "../models/types";
+import type { DeviceModel, NodeKind, RoutingRule } from "../models/types";
 import type { Plan, PlanConnection } from "./plan";
 import { hasConnection } from "./plan";
 import { BUS_TYPE_FIXED, BUS_TYPE_VARI, PAN_BAL_BAL, PAN_BAL_PAN } from "./control/params";
@@ -205,6 +205,17 @@ export function mirrorBalPair(model: DeviceModel, plan: Plan, id: string): boole
     pc.params = { ...pc.params, ...c.params };
   }
   return true;
+}
+
+/** Whether a node reads as inactive (silenced) and should be dimmed alike in both
+ *  views: a muted node (CH_ON / a bus / FX / MONITOR master ON — all on `params.on`),
+ *  a bypassed ducker (`duckerOn`) or the oscillator when not generating (`osc.on`).
+ *  Each off-state lives on a different param, so each kind needs its own check. */
+export function isNodeInactive(plan: Plan, node: { id: string; kind: NodeKind }): boolean {
+  const np = plan.nodeParams?.[node.id];
+  if (node.kind === "ducker") return np?.duckerOn !== true;
+  if (node.id === "bus.osc") return np?.osc?.on !== true;
+  return np?.on === false;
 }
 
 /** Input-port refs that the given output port may currently connect to. */

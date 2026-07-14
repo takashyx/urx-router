@@ -46,4 +46,19 @@ describe("MIDI mapping model", () => {
       { control: "ch2/level", addr: { type: "cc", channel: 0, controller: 11 }, mode: "pickup" },
     ]);
   });
+
+  it("renames the STEREO / MONITOR power LED from the old mute id to chOn", () => {
+    const persisted = [
+      { control: "bus.stereo/mute", addr: { type: "note", channel: 0, note: 60 }, mode: "absolute" },
+      { control: "bus.mon1/mute", addr: { type: "note", channel: 0, note: 61 }, mode: "absolute" },
+      { control: "ch1/mute", addr: { type: "note", channel: 0, note: 62 }, mode: "absolute" }, // the → STEREO send: unchanged
+      { control: "bus.mix1/mute", addr: { type: "note", channel: 0, note: 63 }, mode: "absolute" }, // the TO ST send: unchanged
+    ];
+    expect(sanitizeMappings(persisted).map((m) => m.control)).toEqual([
+      "bus.stereo/chOn",
+      "bus.mon1/chOn",
+      "ch1/mute",
+      "bus.mix1/mute",
+    ]);
+  });
 });

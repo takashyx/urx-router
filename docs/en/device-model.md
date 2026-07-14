@@ -155,9 +155,9 @@ main-fader level** (the CH → STEREO level). The STEREO send itself — being t
   SEND blocks; LEVEL/PAN + a **STEREO-assign ON/OFF** stay editable. That ON is the **post-fader SEND TO
   STEREO switch** added in firmware V1.3 (`params.on`, default ON), **independent of the channel master
   (CH_ON)** — CH_ON mutes the whole channel, this ON only cuts the send into STEREO. It has **no PRE/POST**
-  (this path is the PRE/POST reference point). Seeded at **unity (0 dB)**. In the console the **MAIN tab
-  MUTE** toggles this STEREO assign (just as the MIX/FX tab MUTE toggles each send); the channel master
-  (CH_ON) is set from the graph inspector only (when off the strip dims with a CH MUTE tag).
+  (this path is the PRE/POST reference point). Seeded at **unity (0 dB)**. In the console the head **MUTE chip**
+  toggles this STEREO assign (just as it toggles the MIX TO ST send on a MIX strip); the channel master
+  (CH_ON) is the **scribble power LED** (when off the strip dims, like the muted node in the graph).
 - MIX 1 / MIX 2 — LEVEL/PAN/**PRE/POST** + **ON/OFF (SEND_ON)**. Seeded **ON at -∞ (off)**.
 - FX 1 / FX 2 — LEVEL/**PRE/POST** + **ON/OFF (SEND_ON)** (FX-bus sends are mono and carry **no PAN**). Seeded **ON at -∞ (off)**.
 
@@ -189,14 +189,13 @@ dotted line** so the live routing stands out, and a toolbar **"Hide off sends"**
   - Each leg is seeded at **-∞ (off)** by default so nothing sums until raised. **All ship ON at the factory**
     (SEND_ON = 1 at -∞) and a `new` plan seeds them ON.
   - Each FX channel also has its own **channel ON/OFF** (mute), handled like the input-channel CH_ON.
-    **Both FX 1 and FX 2 ship ON at the factory**. It is **set from the graph inspector only** — the console
-    head MUTE drives the → STEREO assign ON/OFF (the per-send ON/OFF lives in the SENDS rack), so when the
-    channel master is off the strip dims with a **CH MUTE** tag. Off also
-    dims the node on the canvas and tags it MUTE.
+    **Both FX 1 and FX 2 ship ON at the factory**. It is the console **scribble power LED** — the head MUTE
+    drives the → STEREO assign ON/OFF (the per-send ON/OFF lives in the SENDS rack), so when the channel
+    master is off the strip dims (unlit power LED), like the muted node on the canvas which is also tagged MUTE.
   - MIX 1 / MIX 2 buses also have their own **master ON/OFF** (a bus-master switch like the STEREO master;
-    ships ON), independent of the MIX → STEREO TO ST switch. It is **edited only in the graph inspector**; the
-    console shows it read-only — when the master is off the MIX strip dims and gets a CH MUTE tag (the same
-    indicator used for a channel whose master is off). The STEREO / MIX inspector toggles sit at the
+    ships ON), independent of the MIX → STEREO TO ST switch. It is the console **power LED** (or the graph
+    inspector) — when the master is off the MIX strip dims (the same indicator as a channel whose master is
+    off). The STEREO / MIX inspector toggles sit at the
     top of the Parameters section under the same "Channel" label as an FX channel.
   - The STEREO master and each MIX bus also carry a **master BALANCE** — the bus output's L/R balance
     (±63, centre 0; STEREO param 583, MIX 676 with the L/R instances linked per bus). It is edited in the
@@ -346,7 +345,8 @@ Source selection for the analog outputs (MAIN / LINE).
   they *are* drawn as wires (between visible nodes) since their LEVEL/PAN/PRE-POST/ON (SEND_ON; TO ST is ON/OFF
   only) remain editable; only the routing is locked, and an off (ON=OFF) / -∞ send is dimmed on the canvas (§2).
 - MONITOR 1 / 2 have an output **ON/OFF** (the MONITOR-screen [ON] button, factory ON), toggled on the
-  MONITOR node and via the MUTE on the console MONITOR strip.
+  MONITOR node and via the **scribble power LED** on the console MONITOR strip (which has no MUTE chip — it
+  has no → STEREO send).
 - PHONES 1/2/front are a fixed 1:1 wire to the MONITOR buses (no source select, no node). PHONES
   carries the same signal as its MONITOR bus but has its own **PHONES Level** (a unit-less 0.0 …
   10.0 scale, independent of the monitor fader), edited on the MONITOR 1 / 2 nodes — PHONES 1 ↔
