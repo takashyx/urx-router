@@ -332,6 +332,16 @@ export class Console {
       }
     });
     old.root.replaceWith(fresh);
+    // The SEND PAN popover floats free of its strip, so the rebuild above left an
+    // open one anchored to the detached PAN button with stale knob values. Re-open
+    // it against the fresh strip's button: openSendPan re-reads the plan for the
+    // knobs, re-marks the live trigger (.open / aria-expanded) and re-anchors in
+    // place (the fresh strip occupies the old one's slot).
+    if (this.sendPanOpenFor === stripId) {
+      const btn = fresh.querySelector<HTMLElement>(".con-panbtn");
+      if (btn) this.openSendPan(stripId, btn);
+      else this.closeSendPan();
+    }
   }
 
   // ---- build / render ----

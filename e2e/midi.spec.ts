@@ -489,6 +489,36 @@ test("assignments and the port choice survive a reload", async ({ page }) => {
   await expect(page.locator('#midi-panel .mp-row[data-control="ch1/level"]')).toBeVisible();
 });
 
+test("an open SEND PAN popover follows an incoming mapped pan CC", async ({ page }) => {
+  // Regression: an external edit repaints through refreshStrip, which used to
+  // swap the strip without touching an open SEND PAN popover — the knob kept its
+  // stale value and the fresh PAN ▾ button came up unmarked (no .open) while the
+  // popover stayed on screen.
+  await openPanel(page);
+  await pickInputPort(page);
+  const panBtn = () => strip(page, "CH 1").locator(".con-panbtn");
+  const pop = page.locator(".con-spop");
+  const mix1 = () => pop.locator(".pcol", { hasText: "MIX 1" });
+  // The pan knob lives inside the popover, so open it under learn to arm it.
+  await learnBinding(page, async () => {
+    await panBtn().click();
+    await mix1().locator(".con-knob").click();
+  }, [0xb0, 21, 60], [0xb0, 21, 61]);
+  await expect(page.locator('#midi-panel .mp-row[data-control="ch1/pan@bus.mix1"]')).toBeVisible();
+  await page.locator("#midi-panel .mp-learn-btn").click(); // learn off (the press also closes the popover)
+
+  await panBtn().click(); // reopen the popover, then push an external pan edit
+  await expect(pop).toBeVisible();
+  await sendMidi(page, [0xb0, 21, 127]);
+  // The popover follows: its knob shows the new value, and the rebuilt strip's
+  // PAN ▾ button still owns it.
+  await expect(mix1().locator(".rv")).toHaveText("R63");
+  await expect(pop).toBeVisible();
+  await expect(pop.locator(".ph .who")).toHaveText("CH 1");
+  await expect(panBtn()).toHaveClass(/\bopen\b/);
+  await expect(panBtn()).toHaveAttribute("aria-expanded", "true");
+});
+
 test("switching the model cancels an armed learn instead of persisting a dead mapping", async ({ page }) => {
   // While learn is on the panel ignores outside presses, so the toolbar model
   // picker stays reachable; committing the old model's armed id after the
