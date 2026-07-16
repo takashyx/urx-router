@@ -448,6 +448,8 @@ export const en = {
     themeAuto: "Following the system theme",
     language: (name: string): string => `Language: ${name}`,
     loadError: (message: string): string => `Load error: ${message}`,
+    saveError: (message: string): string => `Save error: ${message}`,
+    exportError: (message: string): string => `Export error: ${message}`,
     updateDownloading: "Downloading update… the app will restart",
   },
   confirm: {

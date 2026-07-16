@@ -959,30 +959,36 @@ $("btn-open").addEventListener("click", async () => {
 });
 
 $("btn-save").addEventListener("click", async () => {
-  const res = await saveTextDocument(`${modelId}-plan.json`, serialize(plan), {
-    ext: "json",
-    label: t().filter.plan,
-  });
-  if (!res.saved) {
-    setStatus(t().status.canceled);
-    return;
-  }
-  dirty = false;
-  if (res.path) {
-    recent = rememberRecent({ path: res.path, name: baseName(res.path), modelId });
-    refreshInspector();
-    setStatus(t().status.savedTo(baseName(res.path)));
-  } else {
-    setStatus(t().status.planSaved);
+  // A failed write must keep the plan dirty and surface as a modal, like the
+  // load paths do — a silent rejection would read as a successful save.
+  try {
+    const res = await saveTextDocument(`${modelId}-plan.json`, serialize(plan), {
+      ext: "json",
+      label: t().filter.plan,
+    });
+    if (!res.saved) {
+      setStatus(t().status.canceled);
+      return;
+    }
+    dirty = false;
+    if (res.path) {
+      recent = rememberRecent({ path: res.path, name: baseName(res.path), modelId });
+      refreshInspector();
+      setStatus(t().status.savedTo(baseName(res.path)));
+    } else {
+      setStatus(t().status.planSaved);
+    }
+  } catch (err) {
+    showError(t().status.saveError(String(err)));
   }
 });
 
 $("btn-export").addEventListener("click", () => {
-  graph.exportPng(`${modelId}-routing.png`);
+  graph.exportPng(`${modelId}-routing.png`).catch((err: unknown) => showError(t().status.exportError(String(err))));
 });
 
 $("btn-export-pdf").addEventListener("click", () => {
-  graph.exportPdf(`${modelId}-routing.pdf`);
+  graph.exportPdf(`${modelId}-routing.pdf`).catch((err: unknown) => showError(t().status.exportError(String(err))));
 });
 
 // Third-party license notice (desktop only): the cargo-about page bundled as a
@@ -1050,7 +1056,13 @@ type ErrorReport = { filename: string; markdown: string } | null;
 // and the connection is not held across the (indefinite) dialogs.
 async function offerErrorReport(report: ErrorReport): Promise<void> {
   if (report && (await confirmDialog(t().confirm.deviceErrorExport))) {
-    await saveTextDocument(report.filename, report.markdown, { ext: "md", label: t().filter.errorReport });
+    // A failed report write must surface like a failed plan save — a silent
+    // rejection would read as a saved report.
+    try {
+      await saveTextDocument(report.filename, report.markdown, { ext: "md", label: t().filter.errorReport });
+    } catch (err) {
+      showError(t().status.saveError(String(err)));
+    }
   }
 }
 

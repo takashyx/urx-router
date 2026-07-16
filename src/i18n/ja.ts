@@ -436,6 +436,8 @@ export const ja: Messages = {
     themeAuto: "システム設定に追従します",
     language: (name: string): string => `言語: ${name}`,
     loadError: (message: string): string => `読込エラー: ${message}`,
+    saveError: (message: string): string => `保存エラー: ${message}`,
+    exportError: (message: string): string => `出力エラー: ${message}`,
     updateDownloading: "更新をダウンロード中… 完了後にアプリを再起動します",
   },
   confirm: {
