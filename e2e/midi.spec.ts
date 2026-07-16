@@ -370,6 +370,8 @@ test("the option legend explains every choice of a hovered select", async ({ pag
   await expect(info).toBeVisible();
   await expect(info.locator(".ph .cat")).toHaveText("Take-in mode"); // header names the setting…
   await expect(info.locator(".ph .who")).toHaveText("CH 1 · Level"); // …and the owning assignment
+  // The select announces the same setting + assignment composition on its own.
+  await expect(mode).toHaveAttribute("aria-label", "Take-in mode — CH 1 · Level");
   await expect(info.locator(".ln")).toHaveCount(2); // one note per take-in mode (absolute / pickup)
   await expect(info.locator(".ln.cur .nm")).toHaveText("Absolute"); // current choice highlighted
   await mode.blur();
