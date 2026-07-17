@@ -77,7 +77,25 @@ const single = (l: readonly [number, number], r?: readonly [number, number]): Me
   r ? { key: "post", label: "OUT", l, r } : { key: "post", label: "OUT", l },
 ];
 
-const NODE_TAPS_URX44V: Record<string, MeterTap[]> = {
+const NODE_TAPS_URX22: Record<string, MeterTap[]> = {
+  ch1: monoTaps(0),
+  ch2: monoTaps(1),
+  ch_3_4: stereoTaps(0),
+  ch_5_6: stereoTaps(1),
+  ch_7_8: stereoTaps(2),
+  ch_9_10: stereoTaps(3),
+  "bus.stereo": busTaps(104, 121, 123, 125, 0),
+  "bus.mix1": busTaps(105, 122, 124, 126, 0),
+  "bus.mix2": busTaps(105, 122, 124, 126, 2),
+  "bus.fx1": fxTaps(0, 0),
+  "bus.fx2": fxTaps(1, 2),
+  "bus.stream": single([127, 0], [127, 1]),
+  "bus.mon1": single([129, 0], [129, 1]),
+  "bus.mon2": single([129, 2], [129, 3]),
+  "bus.osc": single([135, 0]),
+};
+
+const NODE_TAPS_URX44: Record<string, MeterTap[]> = {
   ch1: monoTaps(0),
   ch2: monoTaps(1),
   ch3: monoTaps(2),
@@ -99,25 +117,7 @@ const NODE_TAPS_URX44V: Record<string, MeterTap[]> = {
   "bus.osc": single([135, 0]),
 };
 
-const NODE_TAPS_URX22: Record<string, MeterTap[]> = {
-  ch1: monoTaps(0),
-  ch2: monoTaps(1),
-  ch_3_4: stereoTaps(0),
-  ch_5_6: stereoTaps(1),
-  ch_7_8: stereoTaps(2),
-  ch_9_10: stereoTaps(3),
-  "bus.stereo": busTaps(104, 121, 123, 125, 0),
-  "bus.mix1": busTaps(105, 122, 124, 126, 0),
-  "bus.mix2": busTaps(105, 122, 124, 126, 2),
-  "bus.fx1": fxTaps(0, 0),
-  "bus.fx2": fxTaps(1, 2),
-  "bus.stream": single([127, 0], [127, 1]),
-  "bus.mon1": single([129, 0], [129, 1]),
-  "bus.mon2": single([129, 2], [129, 3]),
-  "bus.osc": single([135, 0]),
-};
-
-const NODE_TAPS_URX44: Record<string, MeterTap[]> = NODE_TAPS_URX44V;
+const NODE_TAPS_URX44V: Record<string, MeterTap[]> = NODE_TAPS_URX44;
 
 const getTapsMap = (modelId?: string): Record<string, MeterTap[]> => {
   if (modelId === "URX22") return NODE_TAPS_URX22;
