@@ -205,6 +205,7 @@ export const en = {
     autoMakeup: "Auto Makeup",
     oneKnob: "1-Knob",
     oneKnobLevel: "1-Knob Level",
+    oneKnobDriven: "Driven by 1-Knob (read-only)",
     ssmcs: {
       title: "SSMCS",
       sweetSpotData: "Sweet Spot Data",

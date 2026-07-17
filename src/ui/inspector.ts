@@ -1669,6 +1669,17 @@ function compDetailBlock(
         setComp({ oneKnobLevel: v }),
       ),
     );
+    // The device drives ratio/gain from the 1-knob level and shows them read-only;
+    // mirror that (values come from readback, so they refresh on the next fetch).
+    const dyn = m.inspector.dyn as Record<string, string>;
+    for (const key of ["ratio", "gain"] as const) {
+      const f = fields.find((x) => x.key === key);
+      if (!f) continue;
+      const { row } = paramBlock(dyn[key], formatDyn(compVals[key] ?? f.def, f.unit));
+      row.classList.add("readonly");
+      row.title = m.inspector.oneKnobDriven;
+      frag.append(row);
+    }
     return frag;
   }
   for (const f of fields) {
