@@ -199,6 +199,7 @@ export const ja: Messages = {
     autoMakeup: "Auto Makeup",
     oneKnob: "1-Knob",
     oneKnobLevel: "1-Knob レベル",
+    oneKnobDriven: "1-Knob により自動設定 (読み取り専用)",
     ssmcs: {
       title: "SSMCS",
       sweetSpotData: "Sweet Spot Data",
