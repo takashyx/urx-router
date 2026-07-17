@@ -175,16 +175,18 @@ describe("tapAddrs → apply → reading pipeline (subscription set is sufficien
 });
 
 describe("hasMeter mapping completeness", () => {
-  it("covers exactly the metered console strips and excludes output patches (default URX44/URX44V)", () => {
-    for (const id of [
-      "ch1", "ch4", "ch_5_6", "ch_11_12",
-      "bus.stereo", "bus.mix1", "bus.mix2", "bus.fx1", "bus.fx2",
-      "bus.stream", "bus.mon1", "bus.mon2", "bus.osc",
-    ]) {
-      expect(hasMeter(id), id).toBe(true);
-    }
-    for (const id of ["out.main", "out.line", "out.usbsub", "out.ducker1", "in.aux"]) {
-      expect(hasMeter(id), id).toBe(false);
+  it("covers exactly the metered console strips and excludes output patches (default / URX44V / URX44)", () => {
+    for (const modelId of [undefined, "URX44V", "URX44"] as const) {
+      for (const id of [
+        "ch1", "ch4", "ch_5_6", "ch_11_12",
+        "bus.stereo", "bus.mix1", "bus.mix2", "bus.fx1", "bus.fx2",
+        "bus.stream", "bus.mon1", "bus.mon2", "bus.osc",
+      ]) {
+        expect(hasMeter(id, modelId), `${modelId}: ${id}`).toBe(true);
+      }
+      for (const id of ["out.main", "out.line", "out.usbsub", "out.ducker1", "in.aux"]) {
+        expect(hasMeter(id, modelId), `${modelId}: ${id}`).toBe(false);
+      }
     }
   });
 
@@ -198,19 +200,6 @@ describe("hasMeter mapping completeness", () => {
     }
     for (const id of ["ch3", "ch4", "ch_11_12"]) {
       expect(hasMeter(id, "URX22"), id).toBe(false);
-    }
-  });
-
-  it("covers exactly the metered console strips and excludes output patches for URX44", () => {
-    for (const id of [
-      "ch1", "ch4", "ch_5_6", "ch_11_12",
-      "bus.stereo", "bus.mix1", "bus.mix2", "bus.fx1", "bus.fx2",
-      "bus.stream", "bus.mon1", "bus.mon2", "bus.osc",
-    ]) {
-      expect(hasMeter(id, "URX44"), id).toBe(true);
-    }
-    for (const id of ["out.main", "out.line", "out.usbsub", "out.ducker1", "in.aux"]) {
-      expect(hasMeter(id, "URX44"), id).toBe(false);
     }
   });
 });
