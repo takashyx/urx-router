@@ -183,7 +183,7 @@ describe("hasMeter mapping completeness", () => {
     ]) {
       expect(hasMeter(id, "URX22"), id).toBe(true);
     }
-    for (const id of ["ch3", "ch4", "ch_11_12"]) {
+    for (const id of ["ch3", "ch4", "ch_11_12", "out.main", "out.line", "out.usbsub", "out.ducker1", "in.aux"]) {
       expect(hasMeter(id, "URX22"), id).toBe(false);
     }
   });
