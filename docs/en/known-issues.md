@@ -105,6 +105,23 @@ timing once a delay is set, but the device offers no pre-DELAY reading to show �
 the source bus's own meter (STEREO / MIX, whichever feeds STREAMING) is the
 closest equivalent for the pre-DELAY level.
 
+## The sample rate is only written when the device's Follow USB is off
+
+The planner's **Rate** setting is written to the device (param 766) and re-clocks
+it. That write only lands while the device's own **Follow USB** setting is
+**off**: with Follow USB on, the URX follows the USB host's clock and a software
+rate write is ignored or immediately overridden.
+
+Follow USB itself cannot be read or written from software — it is not exposed as
+a broker parameter at all (verified on a real URX44V by diffing a full parameter
+snapshot across an off → on toggle: no parameter changes). So the planner can
+neither switch it nor detect its state, and it cannot warn when a rate write is
+about to be swallowed.
+
+In practice: if a rate change does not take effect on the hardware, turn
+**Follow USB off** on the device (Setup → the sample-rate screen) and set the
+rate again. The plan keeps the rate it recorded either way.
+
 ## The HDMI sample-rate ceiling depends on the audio mode
 
 The HDMI input's sample-rate ceiling depends on the mode set on the device's
