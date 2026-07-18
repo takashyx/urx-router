@@ -116,6 +116,7 @@ URX Router を使用することで、このリスクを受諾したものとす
 
 - [docs/ja/architecture.md](docs/ja/architecture.md) — アプリ構成と設計判断
 - [docs/ja/device-model.md](docs/ja/device-model.md) — 装置のルーティングモデルと接続制約
+- [docs/ja/console-sends.md](docs/ja/console-sends.md) — CONSOLE ビューのストリップ内センドラック設計
 - [docs/ja/known-issues.md](docs/ja/known-issues.md) — 現時点の制限事項
 
 ## ライセンス
