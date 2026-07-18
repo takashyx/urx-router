@@ -313,7 +313,8 @@ export const MBC_GLOBAL = {
   release: 25, // MBC_RELEASE_MS index
   outGain: 26, // raw = dB + 64
 } as const;
-/** Per-band raw bounds + formatters (shared by all three bands). */
+/** Per-band raw bounds + formatters (shared by all three bands). Iterate the
+ *  bands' parameters via MBC_BAND_KEYS so every consumer sees the same set. */
 export const MBC_BAND_PARAM: Record<
   MbcBandKey,
   { rawMin: number; rawMax: number; def: number; format: (r: number) => string }
@@ -328,6 +329,11 @@ export const MBC_BAND_PARAM: Record<
   },
   gain: { rawMin: 0, rawMax: 55, def: 39, format: mbcGainLabel },
 };
+/** The band parameters, derived from the catalog so a new one cannot be missed by
+ *  a hand-written list. Declaration order — the inspector orders them for display
+ *  instead, so it keeps its own list. */
+export const MBC_BAND_KEYS = Object.keys(MBC_BAND_PARAM) as MbcBandKey[];
+
 /** MBC Out Gain raw → display ("+4 dB"). raw = dB + 64. */
 export const mbcOutGainLabel = (raw: number): string => `${raw - 64} dB`;
 
@@ -551,6 +557,11 @@ export interface InsertFxSlotSpec {
   slot: number;
   /** Second slot written with the same raw (Pitch Coarse/Fine/Formant). */
   mirror?: number;
+  /** Calibrated raw bounds, carried from the catalog so the emit path can bound a
+   *  hand-edited plan to the same range the inspector enforces. Absent where the
+   *  catalog declares none (device-managed flags / table indices). */
+  rawMin?: number;
+  rawMax?: number;
 }
 
 export function insertFxWritableSlots(family: InsertFxFamily): InsertFxSlotSpec[] {
@@ -558,11 +569,20 @@ export function insertFxWritableSlots(family: InsertFxFamily): InsertFxSlotSpec[
   if (cached) return cached;
   if (family === "mbc") {
     const out: InsertFxSlotSpec[] = [];
-    for (const b of MBC_BANDS) out.push({ slot: b.attack }, { slot: b.threshold }, { slot: b.ratio }, { slot: b.gain });
+    for (const b of MBC_BANDS) {
+      for (const key of MBC_BAND_KEYS) {
+        out.push({ slot: b[key], rawMin: MBC_BAND_PARAM[key].rawMin, rawMax: MBC_BAND_PARAM[key].rawMax });
+      }
+    }
     for (const slot of Object.values(MBC_GLOBAL)) out.push({ slot });
     cached = out;
   } else {
-    const out: InsertFxSlotSpec[] = insertFxParams(family).map((d) => ({ slot: d.slot, mirror: d.mirror }));
+    const out: InsertFxSlotSpec[] = insertFxParams(family).map((d) => ({
+      slot: d.slot,
+      mirror: d.mirror,
+      rawMin: d.rawMin,
+      rawMax: d.rawMax,
+    }));
     if (family === "pitch") {
       out.push({ slot: PITCH_SCALE_SLOT });
       for (const slot of PITCH_NOTE_SLOTS) out.push({ slot });

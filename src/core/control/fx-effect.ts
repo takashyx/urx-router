@@ -62,6 +62,13 @@ export function fxFamilyOf(typeValue: number): FxFamily {
   return FAMILY_BY_TYPE.get(typeValue) ?? "delay";
 }
 
+/** True when the value is a real EFFECT TYPE from either channel's menu. Emit
+ *  checks this before writing the selector: an off-menu value would otherwise be
+ *  sent to the device verbatim and drag the (defaulted) delay family with it. */
+export function isFxEffectType(typeValue: number): boolean {
+  return FAMILY_BY_TYPE.has(typeValue);
+}
+
 /** Factory-default EFFECT TYPE per FX channel (FX1 Rev-X Hall, FX2 Mono Delay). */
 export const FX_EFFECT_TYPE_DEFAULT = [0, 1024] as const;
 

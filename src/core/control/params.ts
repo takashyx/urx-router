@@ -694,6 +694,15 @@ export const EQ_ONE_KNOB_TYPE_WIDE_OPTIONS = [
   { value: 0, label: "Intensity" },
   { value: 2, label: "Loudness" },
 ];
+/** Every legal preset value (the union of the two screens' subsets) — the menu the
+ *  emit path validates against, since the device enum itself is shared. */
+export const EQ_ONE_KNOB_TYPE_ALL_OPTIONS = [
+  ...EQ_ONE_KNOB_TYPE_MONO_OPTIONS,
+  ...EQ_ONE_KNOB_TYPE_WIDE_OPTIONS.filter((o) => !EQ_ONE_KNOB_TYPE_MONO_OPTIONS.some((m) => m.value === o.value)),
+];
+/** EQ 1-knob LEVEL raw range (%). */
+export const EQ_ONE_KNOB_LEVEL_MIN = 0;
+export const EQ_ONE_KNOB_LEVEL_MAX = 100;
 
 // COMP knee selector (device labels per user; 0 = Soft verified, default Medium).
 export const COMP_KNEE_DEFAULT = 1;
