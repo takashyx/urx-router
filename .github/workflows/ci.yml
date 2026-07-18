@@ -4,17 +4,24 @@ name: CI
 # (Playwright E2E, third-party license generation) run post-merge; see
 # post-merge.yml.
 # Doc-only changes (Markdown, docs/) don't affect the build or tests, so skip
-# these checks for them.
+# these checks for them — except the skill's generated model references, which
+# skill-export.test.ts diffs against the generator, so an .md-only edit there
+# must still run the unit tests. Patterns are ordered: include everything,
+# negate docs, then re-include the generated files (the last match wins).
 on:
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+    paths:
+      - '**'
+      - '!**/*.md'
+      - '!docs/**'
+      - '.claude/skills/urx-routing-planner/references/model-*.md'
   push:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+    paths:
+      - '**'
+      - '!**/*.md'
+      - '!docs/**'
+      - '.claude/skills/urx-routing-planner/references/model-*.md'
 
 jobs:
   frontend:
