@@ -28,6 +28,7 @@ import {
   FX_SLOT_LEVEL,
   FX_SLOT_ON,
   fxFamilyOf,
+  isFxEffectType,
   fxParams,
 } from "./fx-effect";
 import { insertFxEngine, insertFxFamilyOf, insertFxWritableSlots } from "./insert-fx-effect";
@@ -38,7 +39,15 @@ import {
   COMP_EQ_SSMCS,
   D_GAIN_PARAM,
   denormalizeInsertFx,
+  EQ_ONE_KNOB_LEVEL_MAX,
+  EQ_ONE_KNOB_LEVEL_MIN,
+  EQ_ONE_KNOB_TYPE_ALL_OPTIONS,
+  EQ_ONE_KNOB_TYPE_DEFAULT,
+  EQ_TYPE_HIGH_OPTIONS,
+  EQ_TYPE_LOW_OPTIONS,
+  EQ_TYPE_SHELVING,
   hexToColorIndex,
+  INSERT_FX_NONE,
   INSERT_FX_OPTIONS,
   OUTPUT_INSERT_FX_OPTIONS,
   paramNameForId,
@@ -771,15 +780,47 @@ function pushSsmcsBand(
 // effect's family; raw values pass straight through (the plan stores raw). The
 // type is a sideEffect (writing it repopulates the array on the device), so live
 // converges + re-reads. fxIndex = 0 (FX1) / 1 (FX2).
+// Bound a RAW / enum value to its catalog range — the last line before an
+// out-of-range value reaches the device, since encodeValue's "raw" and "enum"
+// cases are pure passthroughs (every numeric encoder in vd.ts clamps internally,
+// these two cannot: their range lives in the effect / option catalogs, not in the
+// encoder). The inspector already constrains the same bounds, so this only bites
+// on a hand-edited or `?plan=` payload. Range only — callers state their own
+// policy for a non-finite value, which differs by whether a catalog default
+// exists to fall back on.
+function boundRaw(raw: number, lo?: number, hi?: number): number {
+  if (lo !== undefined && raw < lo) return lo;
+  if (hi !== undefined && raw > hi) return hi;
+  return raw;
+}
+
+// A plan-sourced raw with a catalog default: a non-finite value takes the default
+// (plan.ts strips those on load, so this covers hand-built plans only).
+function planRaw(v: number | undefined, def: number): number {
+  return Number.isFinite(v) ? (v as number) : def;
+}
+
+// Coerce an enum to its menu — the same firewall as boundRaw, for the other
+// passthrough encoding. An off-menu value would otherwise be written verbatim and
+// select something the plan never named.
+function boundEnum(v: number, options: readonly { value: number }[], def: number): number {
+  return options.some((o) => o.value === v) ? v : def;
+}
+
 function pushFxEffectCommands(out: VdCommand[], fxIndex: number, fx: FxEffectParams): void {
   const typeId = FX_EFFECT_TYPE_PARAM[fxIndex];
   const arrId = FX_EFFECT_ARRAY_PARAM[fxIndex];
-  const type = fx.type ?? FX_EFFECT_TYPE_DEFAULT[fxIndex];
+  // An off-menu type (hand-edited / ?plan= payload) falls back to the channel's
+  // factory type rather than being written verbatim: the device would take an
+  // unknown selector value, and fxFamilyOf would emit delay-family slots with it.
+  const planType = fx.type ?? FX_EFFECT_TYPE_DEFAULT[fxIndex];
+  const type = isFxEffectType(planType) ? planType : FX_EFFECT_TYPE_DEFAULT[fxIndex];
   out.push(rawCommand("FX_EFFECT_TYPE", typeId, "enum", 0, type));
   out.push(rawCommand("FX_EFFECT_PARAM", arrId, "raw", FX_SLOT_ON, (fx.on ?? true) ? 1 : 0));
-  out.push(rawCommand("FX_EFFECT_PARAM", arrId, "raw", FX_SLOT_LEVEL, fx.level ?? 100));
+  out.push(rawCommand("FX_EFFECT_PARAM", arrId, "raw", FX_SLOT_LEVEL, boundRaw(planRaw(fx.level, 100), 0, 100)));
   for (const desc of fxParams(fxFamilyOf(type))) {
-    out.push(rawCommand("FX_EFFECT_PARAM", arrId, "raw", desc.slot, fx.params?.[desc.key] ?? desc.def));
+    const raw = boundRaw(planRaw(fx.params?.[desc.key], desc.def), desc.rawMin, desc.rawMax);
+    out.push(rawCommand("FX_EFFECT_PARAM", arrId, "raw", desc.slot, raw));
   }
 }
 
@@ -800,8 +841,11 @@ function pushInsertFxEffectCommands(
 ): void {
   if (!params) return;
   for (const s of insertFxWritableSlots(family)) {
-    const raw = params[String(s.slot)];
-    if (raw === undefined) continue;
+    const v = params[String(s.slot)];
+    // No catalog default to fall back on here (an absent slot is left to the
+    // device's per-type default), so a non-finite raw is dropped, not substituted.
+    if (!Number.isFinite(v)) continue;
+    const raw = boundRaw(v, s.rawMin, s.rawMax);
     out.push(rawCommand("INSERT_FX_EFFECT", engine, "raw", s.slot, raw));
     if (s.mirror !== undefined) out.push(rawCommand("INSERT_FX_EFFECT", engine, "raw", s.mirror, raw));
   }
@@ -846,8 +890,10 @@ function pushEqBandCommands(out: VdCommand[], ctrl: EqControl, bands: EqBand[]):
     if (!v) continue;
     for (const inst of ctrl.instances) {
       if (v.on !== undefined) out.push(rawCommand("EQ_BAND_ON", band.on, "bool", inst, v.on ? 1 : 0));
-      if (v.type !== undefined && band.type !== null)
-        out.push(rawCommand("EQ_BAND_TYPE", band.type, "enum", inst, v.type));
+      if (v.type !== undefined && band.type !== null) {
+        const opts = band.name === "low" ? EQ_TYPE_LOW_OPTIONS : EQ_TYPE_HIGH_OPTIONS;
+        out.push(rawCommand("EQ_BAND_TYPE", band.type, "enum", inst, boundEnum(v.type, opts, EQ_TYPE_SHELVING)));
+      }
       if (v.q !== undefined) out.push(rawCommand("EQ_BAND_Q", band.q, "q", inst, v.q));
       if (v.freq !== undefined) out.push(rawCommand("EQ_BAND_FREQ", band.freq, "eqFreq", inst, v.freq));
       if (v.gain !== undefined) out.push(rawCommand("EQ_BAND_GAIN", band.gain, "eqGain", inst, v.gain));
@@ -861,8 +907,16 @@ function pushEqBandCommands(out: VdCommand[], ctrl: EqControl, bands: EqBand[]):
 function pushEqOneKnobCommands(out: VdCommand[], ctrl: EqOneKnobControl, ok: EqOneKnobParams): void {
   for (const inst of ctrl.instances) {
     if (ok.on !== undefined) out.push(rawCommand("EQ_ONE_KNOB_ON", ctrl.on, "bool", inst, ok.on ? 1 : 0));
-    if (ok.type !== undefined) out.push(rawCommand("EQ_ONE_KNOB_TYPE", ctrl.type, "enum", inst, ok.type));
-    if (ok.level !== undefined) out.push(rawCommand("EQ_ONE_KNOB_LEVEL", ctrl.level, "raw", inst, ok.level));
+    // The preset enum is shared across every EQ instance; each screen exposes only
+    // its applicable subset, so the menu here is the union of both subsets.
+    if (ok.type !== undefined) {
+      const type = boundEnum(ok.type, EQ_ONE_KNOB_TYPE_ALL_OPTIONS, EQ_ONE_KNOB_TYPE_DEFAULT);
+      out.push(rawCommand("EQ_ONE_KNOB_TYPE", ctrl.type, "enum", inst, type));
+    }
+    if (ok.level !== undefined) {
+      const level = boundRaw(planRaw(ok.level, EQ_ONE_KNOB_LEVEL_MIN), EQ_ONE_KNOB_LEVEL_MIN, EQ_ONE_KNOB_LEVEL_MAX);
+      out.push(rawCommand("EQ_ONE_KNOB_LEVEL", ctrl.level, "raw", inst, level));
+    }
   }
 }
 
@@ -1030,6 +1084,11 @@ export const OSC_ASSIGN_BUSES = Object.keys(OSC_ASSIGN);
 /** Insert FX for a node: which param, the instance(s) it writes, and its options. */
 export interface InsertFxControl {
   param: number;
+  /** The matching insert FX ON/OFF (bypass) param — 134 / 577 / 670. */
+  onParam: number;
+  /** Output bus (STEREO / MIX) rather than an input channel — the two use
+   *  different option menus and different engine arrays. */
+  isOutput: boolean;
   instances: number[];
   options: InsertFxOption[];
 }
@@ -1048,13 +1107,33 @@ const MIX_INSERT_FX_INSTANCES: Record<string, number[]> = {
  */
 export function insertFxControl(model: DeviceModel, nodeId: string): InsertFxControl | null {
   if (nodeId === "bus.stereo") {
-    return { param: PARAMS.OUTPUT_INSERT_FX_STEREO.id, instances: [0], options: OUTPUT_INSERT_FX_OPTIONS };
+    return {
+      param: PARAMS.OUTPUT_INSERT_FX_STEREO.id,
+      onParam: PARAMS.OUTPUT_INSERT_FX_ON_STEREO.id,
+      isOutput: true,
+      instances: [0],
+      options: OUTPUT_INSERT_FX_OPTIONS,
+    };
   }
   const mix = MIX_INSERT_FX_INSTANCES[nodeId];
-  if (mix) return { param: PARAMS.OUTPUT_INSERT_FX_MIX.id, instances: mix, options: OUTPUT_INSERT_FX_OPTIONS };
+  if (mix) {
+    return {
+      param: PARAMS.OUTPUT_INSERT_FX_MIX.id,
+      onParam: PARAMS.OUTPUT_INSERT_FX_ON_MIX.id,
+      isOutput: true,
+      instances: mix,
+      options: OUTPUT_INSERT_FX_OPTIONS,
+    };
+  }
   const cc = channelControl(model, nodeId);
   if (cc && !isStereoChannel(nodeId)) {
-    return { param: PARAMS.INSERT_FX.id, instances: [cc.y], options: INSERT_FX_OPTIONS };
+    return {
+      param: PARAMS.INSERT_FX.id,
+      onParam: PARAMS.INSERT_FX_ON.id,
+      isOutput: false,
+      instances: [cc.y],
+      options: INSERT_FX_OPTIONS,
+    };
   }
   return null;
 }
@@ -1249,22 +1328,25 @@ export function planToCommands(model: DeviceModel, plan: Plan): VdCommand[] {
   // When the selected effect has editable parameters (guitar amp / pitch fix /
   // compander / multi-band comp), also emit its engine parameter array. The
   // selector binds + populates the engine; the array writes override with the
-  // plan's values (absolute state, like the FX-channel effects).
+  // plan's values (absolute state, like the FX-channel effects). The ON/OFF
+  // (bypass) switch is emitted after the selector: the device auto-engages it on
+  // every (re)selection, so the plan's state must land last to stick. With No
+  // Effect selected the device ignores the switch, so it is not written then.
   for (const node of model.nodes) {
     const ifx = insertFxControl(model, node.id);
-    const v = plan.nodeParams[node.id]?.insertFx;
-    if (!ifx || v === undefined) continue;
+    const np = plan.nodeParams[node.id] ?? {};
+    if (!ifx || np.insertFx === undefined) continue;
+    // An off-menu selector value is coerced to No Effect rather than written: the
+    // device would take it verbatim and could bind an effect the plan never named.
+    const v = ifx.options.some((o) => o.value === np.insertFx) ? np.insertFx : INSERT_FX_NONE;
     for (const inst of ifx.instances) out.push(rawCommand("INSERT_FX", ifx.param, "insertFx", inst, v));
-    const fam = insertFxFamilyOf(v);
-    if (fam) {
-      const isOutput = ifx.param !== PARAMS.INSERT_FX.id;
-      pushInsertFxEffectCommands(
-        out,
-        insertFxEngine(fam.family, isOutput),
-        fam.family,
-        plan.nodeParams[node.id]?.insertFxParams,
-      );
+    if (np.insertFxOn !== undefined && v !== INSERT_FX_NONE) {
+      for (const inst of ifx.instances) {
+        out.push(rawCommand("INSERT_FX_ON", ifx.onParam, "bool", inst, np.insertFxOn ? 1 : 0));
+      }
     }
+    const fam = insertFxFamilyOf(v);
+    if (fam) pushInsertFxEffectCommands(out, insertFxEngine(fam.family, ifx.isOutput), fam.family, np.insertFxParams);
     own(node.id);
   }
 

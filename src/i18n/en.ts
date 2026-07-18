@@ -187,6 +187,7 @@ export const en = {
     clipSafe: "Clip Safe",
     hiZ: "Hi-Z",
     insertFx: "Insert FX",
+    insertFxOn: "Insert FX ON",
     compEqType: "COMP/EQ Type",
     eqOn: "EQ",
     compOn: "COMP",
@@ -530,6 +531,7 @@ export const en = {
     badPlanUrl: "The plan link is malformed (could not be decoded)",
     planUrlUnsupported:
       "This browser doesn't support compressed plan links — use a recent Chrome / Edge / Firefox, or Safari 16.4+",
+    planVersionUnsupported: "This plan was saved by a newer version of URX Router — update the app to open it",
   },
 };
 

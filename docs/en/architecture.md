@@ -707,7 +707,7 @@ version stays independent as the crate version).
 
 | Platform | Output | Notes |
 | --- | --- | --- |
-| macOS (Apple silicon) | `.dmg` + `.app` (`src-tauri/target/release/bundle/`) | arm64 only; ad-hoc signed (Gatekeeper warning until notarized) |
+| macOS (Apple silicon) | `.dmg` + `.app` (`src-tauri/target/release/bundle/`) | arm64 only; a local build is ad-hoc signed (Gatekeeper warning) — CI release builds are Developer ID signed and notarized (see below) |
 | Windows | `.msi` + `.exe` (NSIS) | built on a Windows host or in CI; cross-compiling from macOS is unsupported |
 
 Releases are automated by `.github/workflows/release.yml`. Pushing a `vX.Y.Z`
@@ -739,7 +739,9 @@ as an explicit `toolchain:` input, updated manually.
 
 Separate from the desktop app, a browser-only demo is published to GitHub Pages. `vite build --mode demo`
 (`pnpm build:demo`, with `.env.demo` setting `VITE_DEMO=1`) builds it, and `.github/workflows/pages.yml`
-publishes `dist` to Pages when a `vX.Y.Z` release tag is pushed, so the demo tracks released versions. The demo is a viewer, so file save / load and PNG / PDF
+publishes `dist` to Pages when a `vX.Y.Z` release tag is pushed, so the demo tracks released versions. To
+check the demo bundle locally before a tag, run `pnpm build:demo` then `pnpm preview` (serves `dist` at
+`http://localhost:4173`). The demo is a viewer, so file save / load and PNG / PDF
 export are hidden from the toolbar (`src/core/env.ts`'s `DEMO` flag hides `[data-demo-hide]` elements). In
 their place the demo reveals `[data-demo-only]` controls: Share URL copies the plan as a `?plan=` deep link
 (also placed in the address bar as a copy-by-hand fallback), and Download JSON downloads the plan document —

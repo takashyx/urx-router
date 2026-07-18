@@ -33,6 +33,7 @@ and Live sync are always enabled in the desktop build (vd protocol, `src/core/co
 - `docs/en/` + `docs/ja/` — `device-model.md` (grounding for the routing rules) / `architecture.md` (architecture) / `known-issues.md` (list of limitations that cannot be reflected on the device) / `console-sends.md` (design spec for the CONSOLE per-strip SENDS rack that replaced the "Send to" tabs, plus the scribble power LED). Keep English and Japanese in sync
 - `reference/` — primary-source PDFs (block diagram, user guide) and reverse-engineered vd protocol dumps under `.local/` (`vd-protocol.md`/`vd-params.md` etc.; the grounding for `control/`). **Managed in a separate private repository; the entire directory, README included, is excluded from this public repository** (`/reference/` in `.gitignore`). **Treat these private docs as part of this project: edit and keep them in sync exactly like the tracked files (e.g. correct `vd-params.md` when a device fact is confirmed). Only their commit/push timing to the private repo is managed separately — never skip a needed edit because the file lives in the private repo**
 - `scripts/gen-icon.mjs` — zero-dependency app icon generator (`node scripts/gen-icon.mjs` → `pnpm tauri icon scripts/app-icon.png`)
+- `scripts/capture-screenshots.mjs` — README screenshot capture: serves the `pnpm build:demo` output and drives Playwright Chromium (graph + console × EN/JA, dark theme, URX44V) into `docs/assets/`; the console shot widens the viewport to fit `.con-strips`
 
 ## Development
 
@@ -42,6 +43,7 @@ pnpm dev          # browser http://localhost:5173 (no Rust required)
 pnpm tauri dev    # desktop app (Rust required; install via rustup if missing)
 pnpm build        # tsc --noEmit + vite build
 pnpm build:demo   # browser demo build (VITE_DEMO=1; excludes save/image export)
+pnpm preview      # serve the built dist/ at http://localhost:4173 (browser check of a build:demo bundle)
 pnpm test         # vitest (core: routing/constraints/plan/levels/meters/midi, control: vd/translate/readback/live/follow/fx/insert-fx/firmware etc., models)
 pnpm test:e2e     # Playwright E2E (e2e/*.spec.ts: routing/hide/notes/multiselect/bustype/signaltype/insertfx/midi etc.). CI runs this post-merge
 pnpm format       # Prettier --write on the TS sources (src/e2e/scripts + root *.ts; config = package.json "prettier", printWidth 120)
@@ -76,4 +78,4 @@ CI is 5 workflows: PRs run build + unit tests (`ci.yml`) and get formatting auto
 
 - Block diagram (`MWEM-C0`): <https://usa.yamaha.com/files/download/other_assets/5/2927055/urx44v_44_22_block_diagram_en_c0.pdf>
 - User guide (HTML): <https://manual.yamaha.com/audio/music_audio_production/urx44_urx22/ug/en-US/>
-- Official control software: TOOLS for MGX / URX (future target for control analysis)
+- Official control software: TOOLS for MGX / URX (the control-protocol analysis source behind `src/core/control/`; analysis complete)

@@ -178,6 +178,7 @@ export const ja: Messages = {
     clipSafe: "Clip Safe",
     hiZ: "Hi-Z",
     insertFx: "Insert FX",
+    insertFxOn: "Insert FX ON",
     compEqType: "COMP/EQ Type",
     eqOn: "EQ",
     compOn: "COMP",
@@ -518,5 +519,7 @@ export const ja: Messages = {
     badPlanUrl: "計画リンクが不正です (デコードできません)",
     planUrlUnsupported:
       "このブラウザは圧縮された計画リンクに対応していません — 新しい Chrome / Edge / Firefox、または Safari 16.4 以降をご利用ください",
+    planVersionUnsupported:
+      "この計画は新しいバージョンの URX Router で保存されています — アプリを更新してから開いてください",
   },
 };
