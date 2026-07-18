@@ -593,6 +593,13 @@ macOS の署名・公証は任意で、署名 secret (`MACOS_SIGNING_CERT` / `MA
 (secret 名は他リポジトリと共通化)。Windows のコンソールウィンドウは `src-tauri/src/main.rs` の
 `windows_subsystem = "windows"` によりリリースビルドで既に抑止される (dev / `cargo build` では出る)。
 
+全ワークフローでサードパーティのアクションはバージョンコメント付きの commit SHA
+(`uses: owner/repo@<sha> # vX.Y.Z`) にピン留めし、上流タグの移動や改竄で CI の実行内容が
+変わらないようにする。Dependabot の `github-actions` エコシステム (`.github/dependabot.yml`) が
+SHA とコメントを一緒にバンプする。例外は `dtolnay/rust-toolchain` で、バージョンタグを持たず
+チャンネルブランチが force-push されるため、append-only な `master` コミットにピン留めし
+(チャンネルは `toolchain:` 入力で明示)、手動で更新する。
+
 ### ブラウザデモ (GitHub Pages)
 
 デスクトップ版とは別に、ブラウザだけで試せるデモを GitHub Pages で配信する。`vite build --mode demo`

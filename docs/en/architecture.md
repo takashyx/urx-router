@@ -728,6 +728,13 @@ The Windows console window is already suppressed in release builds by
 `windows_subsystem = "windows"` in `src-tauri/src/main.rs` (it appears in dev /
 `cargo build`).
 
+Across all workflows, third-party actions are pinned to full commit SHAs with a version comment
+(`uses: owner/repo@<sha> # vX.Y.Z`), so a moved or compromised upstream tag cannot change what runs
+in CI. Dependabot's `github-actions` ecosystem (`.github/dependabot.yml`) bumps the pin and the
+comment together. `dtolnay/rust-toolchain` is the exception: it has no version tags and its channel
+branches are force-pushed, so it is pinned to an append-only `master` commit with the channel passed
+as an explicit `toolchain:` input, updated manually.
+
 ### Browser demo (GitHub Pages)
 
 Separate from the desktop app, a browser-only demo is published to GitHub Pages. `vite build --mode demo`
