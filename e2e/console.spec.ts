@@ -488,3 +488,22 @@ test("switching the model rebuilds the console strip set in place", async ({ pag
   await expect(strip(page, "CH 3/4")).toBeVisible(); // now a stereo pair
   await expect(strip(page, "STEREO")).toBeVisible(); // master persists
 });
+
+test("a very short window keeps a usable fader instead of crushing it", async ({ page }) => {
+  // The head and the SENDS rack are fixed heights, so a short window (devtools
+  // docked to the bottom) used to squeeze the fader zone to nothing. It now holds
+  // a floor and the overflow goes to the strip grid's vertical scroll.
+  await page.setViewportSize({ width: 1280, height: 380 });
+  const zone = strip(page, "CH 1").locator(".con-faderzone");
+  await expect(zone).toBeVisible();
+  const box = await zone.boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(140);
+  // The window itself still never scrolls — the strip grid owns the overflow.
+  const m = await page.evaluate(() => {
+    const app = document.documentElement;
+    const strips = document.querySelector(".con-strips") as HTMLElement;
+    return { bodyVOver: app.scrollHeight - app.clientHeight, stripsVOver: strips.scrollHeight - strips.clientHeight };
+  });
+  expect(m.bodyVOver).toBe(0);
+  expect(m.stripsVOver).toBeGreaterThan(0);
+});

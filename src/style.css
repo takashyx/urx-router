@@ -1567,6 +1567,12 @@ select:focus-visible,
   flex-direction: column;
   border-right: 1px solid var(--line);
   background: var(--panel);
+  /* The head and the SENDS rack are fixed heights, so on a very short window
+     (devtools docked to the bottom) they would eat the whole strip and squeeze
+     the fader zone to nothing. min-content keeps the strip at least as tall as
+     its floors demand, overriding the stretch from .con-group — the overflow
+     then goes to .con-strips' vertical scroll instead of crushing the fader. */
+  min-height: min-content;
 }
 /* A node whose master is off (power LED off): dim the whole strip like the graph
    dims a muted node, while its other controls (MUTE / sends / EQ) stay operable. */
@@ -1778,7 +1784,10 @@ select:focus-visible,
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  /* A floor rather than 0: the zone still shrinks to share the window with the
+     head and the SENDS rack, but never below a usable fader/meter travel (see
+     .con-strip's min-content note). */
+  min-height: 140px;
 }
 /* Meter-point header row above the fader/meter. Fixed height (reserved even when a
    single-meter strip has no badge) so fader tops align across all strips. The
